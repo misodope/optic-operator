@@ -8,7 +8,8 @@ const opticOperatorApi: OpticOperatorApi = {
   },
   devices: {
     getPermissionState: (kind) =>
-      ipcRenderer.invoke('devices:get-permission-state', kind) as Promise<'unknown'>,
+      ipcRenderer.invoke('devices:get-permission-state', kind),
+    requestPermission: (kind) => ipcRenderer.invoke('devices:request-permission', kind),
   },
   recording: {
     getState: () => ipcRenderer.invoke('recording:get-state'),

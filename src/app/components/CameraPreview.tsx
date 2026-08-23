@@ -1,11 +1,32 @@
+import type { RefObject } from 'react';
+
+import type { CameraError, CameraStatus, CameraStreamInfo } from '../../types/camera';
+import { formatAspectRatio, isLowResolution } from '../../lib/utils/aspectRatio';
+
 interface CameraPreviewProps {
   deviceLabel: string | null;
-  status:
-    'idle' | 'permission-required' | 'connecting' | 'ready' | 'disconnected' | 'error';
+  status: CameraStatus;
+  streamInfo: CameraStreamInfo | null;
+  error: CameraError | null;
+  videoRef: RefObject<HTMLVideoElement | null>;
+  onReconnect: () => void;
 }
 
-export function CameraPreview({ deviceLabel, status }: CameraPreviewProps) {
-  const hasSource = status === 'ready';
+const formatFrameRate = (frameRate: number | null): string =>
+  frameRate === null ? 'unknown fps' : `${frameRate.toFixed(1)} fps`;
+
+export function CameraPreview({
+  deviceLabel,
+  status,
+  streamInfo,
+  error,
+  videoRef,
+  onReconnect,
+}: CameraPreviewProps) {
+  const hasSource = status === 'ready' && streamInfo !== null;
+  const lowResolution = streamInfo
+    ? isLowResolution(streamInfo.width, streamInfo.height)
+    : false;
 
   return (
     <section className="preview-card preview-card-source" aria-label="Camera preview">
@@ -19,25 +40,64 @@ export function CameraPreview({ deviceLabel, status }: CameraPreviewProps) {
         </span>
       </div>
       <div className="source-preview">
-        {hasSource ? (
-          <div className="source-placeholder source-placeholder-active">
-            <span className="source-grid" />
-            <strong>{deviceLabel ?? 'Selected camera'}</strong>
-            <span>Live source preview will appear here.</span>
-          </div>
-        ) : (
+        <video
+          ref={videoRef}
+          className={`source-video ${hasSource ? 'source-video-visible' : ''}`}
+          autoPlay
+          muted
+          playsInline
+          aria-label="Raw camera source"
+        />
+        {!hasSource && (
           <div className="source-placeholder">
             <div className="camera-glyph" aria-hidden="true">
               ◉
             </div>
-            <strong>No camera connected</strong>
-            <span>Connect the LUMIX S9 through an HDMI capture card to begin.</span>
+            <strong>
+              {status === 'connecting'
+                ? 'Connecting to camera'
+                : status === 'permission-required'
+                  ? 'Camera permission required'
+                  : 'No camera connected'}
+            </strong>
+            <span>
+              {status === 'connecting'
+                ? 'Waiting for the selected source to report its video mode.'
+                : status === 'permission-required'
+                  ? 'Allow camera access in macOS System Settings, then reconnect the source.'
+                  : 'Connect the LUMIX S9 through an HDMI capture card to begin.'}
+            </span>
+            {(status === 'error' || status === 'disconnected') && (
+              <button className="secondary-button" type="button" onClick={onReconnect}>
+                Reconnect source
+              </button>
+            )}
           </div>
         )}
       </div>
+      {streamInfo && (
+        <div className="source-metadata" aria-label="Negotiated source metadata">
+          <span>
+            {streamInfo.width} × {streamInfo.height}
+          </span>
+          <span>{formatFrameRate(streamInfo.frameRate)}</span>
+          <span>{formatAspectRatio(streamInfo.aspectRatio)}</span>
+        </div>
+      )}
+      {lowResolution && (
+        <p className="quality-warning">
+          HDMI capture recommended for production; this source is below the 1080p
+          quality target.
+        </p>
+      )}
+      {error && (
+        <p className="error-message" role="alert">
+          {error.message}
+        </p>
+      )}
       <p className="preview-caption">
-        The raw source stays separate from the vertical composition so input quality is
-        always visible.
+        {deviceLabel ?? 'No source selected'} · The raw source stays separate from the
+        vertical composition so input quality is always visible.
       </p>
     </section>
   );

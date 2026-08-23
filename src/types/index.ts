@@ -13,6 +13,11 @@ export interface OpticOperatorApi {
     getPermissionState: (
       kind: 'camera' | 'microphone',
     ) => Promise<MediaPermissionState>;
+    requestPermission: (kind: 'camera' | 'microphone') => Promise<{
+      granted: boolean;
+      state: MediaPermissionState;
+      error: import('./camera').CameraError | null;
+    }>;
   };
   recording: {
     getState: () => Promise<RecordingState>;

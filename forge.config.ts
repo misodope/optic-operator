@@ -12,6 +12,12 @@ const config: ForgeConfig = {
     asar: true,
     name: 'Optic Operator',
     executableName: 'optic-operator',
+    extendInfo: {
+      NSCameraUsageDescription:
+        'Optic Operator uses the camera feed to create a live vertical composition.',
+      NSMicrophoneUsageDescription:
+        'Optic Operator uses the selected microphone or capture-card audio input for recordings.',
+    },
   },
   rebuildConfig: {},
   makers: [

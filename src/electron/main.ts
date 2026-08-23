@@ -2,20 +2,20 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
+import { registerDeviceIpcHandlers } from './ipc/devices';
+
 if (started) {
   app.quit();
 }
 
 const IPC_CHANNELS = {
   getVersion: 'app:get-version',
-  getPermissionState: 'devices:get-permission-state',
   getRecordingState: 'recording:get-state',
   getDefaultSessionDirectory: 'files:get-default-session-directory',
 } as const;
 
 const registerIpcHandlers = (): void => {
   ipcMain.handle(IPC_CHANNELS.getVersion, () => app.getVersion());
-  ipcMain.handle(IPC_CHANNELS.getPermissionState, () => 'unknown');
   ipcMain.handle(IPC_CHANNELS.getRecordingState, () => ({
     status: 'idle',
     elapsedMs: 0,
@@ -51,6 +51,7 @@ const createWindow = (): void => {
 
 app.whenReady().then(() => {
   registerIpcHandlers();
+  registerDeviceIpcHandlers();
   createWindow();
 });
 
