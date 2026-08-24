@@ -13,6 +13,7 @@ interface CameraPreviewProps {
   onReconnect: () => void;
   trackingStatus?: RuntimeTrackingStatus;
   trackingConfidence?: number;
+  trackingError?: string | null;
 }
 
 const formatFrameRate = (frameRate: number | null): string =>
@@ -27,6 +28,7 @@ export function CameraPreview({
   onReconnect,
   trackingStatus = 'disabled',
   trackingConfidence = 0,
+  trackingError = null,
 }: CameraPreviewProps) {
   const hasSource = status === 'ready' && streamInfo !== null;
   const lowResolution = streamInfo
@@ -94,6 +96,11 @@ export function CameraPreview({
           <span>{trackingStatus.replace('-', ' ')}</span>
           <span>{Math.round(trackingConfidence * 100)}% confidence</span>
         </div>
+      )}
+      {hasSource && trackingError && (
+        <p className="error-message" role="alert">
+          Tracking error: {trackingError}
+        </p>
       )}
       {lowResolution && (
         <p className="quality-warning">

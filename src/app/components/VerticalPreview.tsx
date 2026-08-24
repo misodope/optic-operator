@@ -17,6 +17,7 @@ interface VerticalPreviewProps {
   videoRef: RefObject<HTMLVideoElement | null>;
   subject?: SubjectState | null;
   trackingStatus?: RuntimeTrackingStatus;
+  trackingError?: string | null;
 }
 
 const QUALITY_LABELS: Record<CameraControllerState['qualityState'], string> = {
@@ -41,6 +42,7 @@ export function VerticalPreview({
   videoRef,
   subject = null,
   trackingStatus = 'disabled',
+  trackingError = null,
 }: VerticalPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const controllerRef = useRef<CameraController | null>(null);
@@ -147,6 +149,11 @@ export function VerticalPreview({
           <span>{TRACKING_LABELS[trackingStatus]}</span>
           <span>{controllerState.qualityScale.toFixed(2)}× source scale</span>
         </div>
+      )}
+      {trackingError && (
+        <p className="error-message" role="alert">
+          Tracking error: {trackingError}
+        </p>
       )}
       <div className="vertical-preview-controls">
         <p className="preview-caption">

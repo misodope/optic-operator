@@ -398,6 +398,7 @@ export function App() {
           onReconnect={handleReconnect}
           trackingStatus={tracking.status}
           trackingConfidence={tracking.confidence}
+          trackingError={tracking.error}
         />
         <VerticalPreview
           preset={preset}
@@ -406,6 +407,7 @@ export function App() {
           videoRef={videoRef}
           subject={tracking.subject}
           trackingStatus={tracking.status}
+          trackingError={tracking.error}
         />
       </section>
 
