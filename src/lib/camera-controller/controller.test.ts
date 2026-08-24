@@ -123,6 +123,32 @@ describe('camera controller', () => {
     expect(0.5 - left.cropCenterX).toBeCloseTo(right.cropCenterX - 0.5);
   });
 
+  it('amplifies directional torso movement in Walk & Talk mode', () => {
+    const walkAndTalk = FRAMING_PRESETS.find(
+      (candidate) => candidate.id === 'walk-and-talk',
+    )?.config;
+
+    expect(walkAndTalk).toBeDefined();
+
+    const controller = new CameraController();
+    controller.update({
+      subject: subject(0),
+      source,
+      output,
+      preset: walkAndTalk!,
+      nowMs: 0,
+    });
+    const state = controller.update({
+      subject: subject(33, { x: 0.5, shoulderCenterX: 0.35 }),
+      source,
+      output,
+      preset: walkAndTalk!,
+      nowMs: 33,
+    });
+
+    expect(state.targetCropCenterX).toBeLessThan(0.47);
+  });
+
   it('holds the last good state, then widens on tracking loss', () => {
     const controller = new CameraController();
     controller.update({ subject: subject(0), source, output, preset, nowMs: 0 });

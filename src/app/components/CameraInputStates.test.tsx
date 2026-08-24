@@ -90,6 +90,7 @@ describe('camera input UI states', () => {
             deadZoneY: 0.03,
             targetEyeY: 0.32,
             preferredShoulderVisibility: 0.7,
+            bodyFollowGain: 1,
             maxPanSpeed: 0.4,
             maxZoomSpeed: 0.2,
             panResponseMs: 400,
