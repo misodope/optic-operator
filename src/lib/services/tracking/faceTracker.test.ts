@@ -44,6 +44,13 @@ describe('tracking normalization', () => {
     });
   });
 
+  it('does not discard a face when the model reports zero visibility values', () => {
+    const face = normalizeFaceLandmarks([faceCandidate(0)]);
+
+    expect(face?.eyesDetected).toBe(true);
+    expect(face?.confidence).toBeGreaterThan(0.8);
+  });
+
   it('falls back to the face bounds when one eye is missing', () => {
     const candidate = faceCandidate();
     candidate.length = 100;

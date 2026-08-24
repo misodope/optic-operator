@@ -43,6 +43,16 @@ const average = (values: Array<number | undefined>, fallback = 1): number => {
     : valid.reduce((total, value) => total + clamp(value, 0, 1), 0) / valid.length;
 };
 
+const averagePositive = (values: Array<number | undefined>, fallback = 1): number => {
+  const positive = values.filter(
+    (value): value is number => finite(value) && value > 0,
+  );
+  return positive.length === 0
+    ? fallback
+    : positive.reduce((total, value) => total + clamp(value, 0, 1), 0) /
+        positive.length;
+};
+
 const landmarkAt = (landmarks: LandmarkPoint[], index: number): LandmarkPoint | null =>
   landmarks[index] ?? null;
 
@@ -115,7 +125,10 @@ export const normalizeFaceLandmarks = (
   const eyesDetected = leftEye !== null && rightEye !== null;
   const eyeX = eyesDetected ? (leftEye.x + rightEye.x) / 2 : bounds.centerX;
   const eyeY = eyesDetected ? (leftEye.y + rightEye.y) / 2 : bounds.centerY;
-  const visibility = average(landmarks.map((landmark) => landmark.visibility));
+  // Face Landmarker versions can expose visibility as zero for otherwise valid
+  // face landmarks. Treat an all-zero visibility field as unspecified rather
+  // than turning a detected face into a zero-confidence subject.
+  const visibility = averagePositive(landmarks.map((landmark) => landmark.visibility));
 
   return {
     landmarks,
