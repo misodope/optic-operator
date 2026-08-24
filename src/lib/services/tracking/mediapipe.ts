@@ -4,6 +4,7 @@ import {
   normalizePoseLandmarks,
 } from './faceTracker';
 import type {
+  FaceTrackingSummary,
   LandmarkPoint,
   RuntimeTrackingStatus,
   SubjectState,
@@ -149,6 +150,10 @@ export class MediaPipeTracker {
   private lastReportedFaceLandmarkCount = -1;
 
   private lastReportedPoseLandmarkCount = -1;
+
+  private lastFace: FaceTrackingSummary | null = null;
+
+  private lastFaceTimestampMs = -Infinity;
 
   private readonly handleMessageBound = (
     event: MessageEvent<MediaPipeWorkerResponse>,
@@ -326,7 +331,14 @@ export class MediaPipeTracker {
     this.lastResultTimestampMs = response.timestampMs;
     this.resultCount += 1;
     this.firstResultAtMs ??= response.timestampMs;
-    const face = normalizeFaceLandmarks(response.faceLandmarks);
+    const detectedFace = normalizeFaceLandmarks(response.faceLandmarks);
+    if (detectedFace) {
+      this.lastFace = detectedFace;
+      this.lastFaceTimestampMs = response.timestampMs;
+    }
+    const face =
+      detectedFace ??
+      (response.timestampMs - this.lastFaceTimestampMs <= 500 ? this.lastFace : null);
     const pose = normalizePoseLandmarks(response.poseLandmarks);
     const subject = combineTrackingResults({
       face,

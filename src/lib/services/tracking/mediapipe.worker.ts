@@ -76,9 +76,9 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
         baseOptions: { modelAssetPath: request.assets.face },
         runningMode: 'VIDEO',
         numFaces: 2,
-        minFaceDetectionConfidence: 0.45,
-        minFacePresenceConfidence: 0.45,
-        minTrackingConfidence: 0.45,
+        minFaceDetectionConfidence: 0.3,
+        minFacePresenceConfidence: 0.3,
+        minTrackingConfidence: 0.3,
         outputFaceBlendshapes: false,
         outputFacialTransformationMatrixes: false,
       });
