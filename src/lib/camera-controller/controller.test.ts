@@ -98,6 +98,31 @@ describe('camera controller', () => {
     expect(state.crop.x + state.crop.width).toBeLessThanOrEqual(1);
   });
 
+  it('uses the same horizontal response for matching left and right moves', () => {
+    const leftController = new CameraController();
+    const rightController = new CameraController();
+
+    leftController.update({ subject: subject(0), source, output, preset, nowMs: 0 });
+    rightController.update({ subject: subject(0), source, output, preset, nowMs: 0 });
+
+    const left = leftController.update({
+      subject: subject(33, { x: 0.25, shoulderCenterX: 0.25 }),
+      source,
+      output,
+      preset,
+      nowMs: 33,
+    });
+    const right = rightController.update({
+      subject: subject(33, { x: 0.75, shoulderCenterX: 0.75 }),
+      source,
+      output,
+      preset,
+      nowMs: 33,
+    });
+
+    expect(0.5 - left.cropCenterX).toBeCloseTo(right.cropCenterX - 0.5);
+  });
+
   it('holds the last good state, then widens on tracking loss', () => {
     const controller = new CameraController();
     controller.update({ subject: subject(0), source, output, preset, nowMs: 0 });

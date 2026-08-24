@@ -6,10 +6,12 @@ import {
 import type {
   FaceTrackingSummary,
   LandmarkPoint,
+  PoseTrackingSummary,
   RuntimeTrackingStatus,
   SubjectState,
   TrackingDiagnostics,
 } from '../../../types/tracking';
+import { clamp } from '../../utils/clamp';
 
 export interface ModelAssetPaths {
   wasm: string;
@@ -84,7 +86,50 @@ const statusForSubject = (subject: SubjectState): RuntimeTrackingStatus => {
 // Keep the last usable face briefly when MediaPipe misses an individual frame.
 // This prevents the virtual camera and debug box from flickering during normal
 // motion, while still allowing the subject to be considered lost promptly.
-const FACE_HOLD_MS = 1000;
+const FACE_HOLD_MS = 2000;
+
+const translateFaceWithPose = (
+  face: FaceTrackingSummary,
+  previousPose: PoseTrackingSummary | null,
+  currentPose: PoseTrackingSummary | null,
+): FaceTrackingSummary => {
+  const hasPreviousAnchor =
+    previousPose?.shoulderCenterX !== null &&
+    previousPose?.shoulderCenterX !== undefined &&
+    previousPose?.shoulderCenterY !== null &&
+    previousPose?.shoulderCenterY !== undefined;
+  const hasCurrentAnchor =
+    currentPose?.shoulderCenterX !== null &&
+    currentPose?.shoulderCenterX !== undefined &&
+    currentPose?.shoulderCenterY !== null &&
+    currentPose?.shoulderCenterY !== undefined;
+
+  if (!hasPreviousAnchor || !hasCurrentAnchor) {
+    return face;
+  }
+
+  // Shoulder movement is a useful fallback when the face detector misses a
+  // frame. Damp the translation slightly because pose landmarks are noisier
+  // than face landmarks.
+  const translationX =
+    ((currentPose.shoulderCenterX ?? 0) - (previousPose.shoulderCenterX ?? 0)) * 0.65;
+  const translationY =
+    ((currentPose.shoulderCenterY ?? 0) - (previousPose.shoulderCenterY ?? 0)) * 0.65;
+
+  return {
+    ...face,
+    landmarks: face.landmarks.map((landmark) => ({
+      ...landmark,
+      x: clamp(landmark.x + translationX, 0, 1),
+      y: clamp(landmark.y + translationY, 0, 1),
+    })),
+    centerX: clamp(face.centerX + translationX, 0, 1),
+    centerY: clamp(face.centerY + translationY, 0, 1),
+    eyeX: clamp(face.eyeX + translationX, 0, 1),
+    eyeY: clamp(face.eyeY + translationY, 0, 1),
+    confidence: Math.min(face.confidence, 0.75),
+  };
+};
 
 const localAssetUrl = (assetPath: string): string => {
   if (typeof document === 'undefined') {
@@ -157,6 +202,8 @@ export class MediaPipeTracker {
   private lastReportedPoseLandmarkCount = -1;
 
   private lastFace: FaceTrackingSummary | null = null;
+
+  private lastFacePose: PoseTrackingSummary | null = null;
 
   private lastFaceTimestampMs = -Infinity;
 
@@ -336,17 +383,18 @@ export class MediaPipeTracker {
     this.lastResultTimestampMs = response.timestampMs;
     this.resultCount += 1;
     this.firstResultAtMs ??= response.timestampMs;
+    const pose = normalizePoseLandmarks(response.poseLandmarks);
     const detectedFace = normalizeFaceLandmarks(response.faceLandmarks);
     if (detectedFace) {
       this.lastFace = detectedFace;
       this.lastFaceTimestampMs = response.timestampMs;
+      this.lastFacePose = pose;
     }
     const face =
       detectedFace ??
-      (response.timestampMs - this.lastFaceTimestampMs <= FACE_HOLD_MS
-        ? this.lastFace
+      (this.lastFace && response.timestampMs - this.lastFaceTimestampMs <= FACE_HOLD_MS
+        ? translateFaceWithPose(this.lastFace, this.lastFacePose, pose)
         : null);
-    const pose = normalizePoseLandmarks(response.poseLandmarks);
     const subject = combineTrackingResults({
       face,
       pose,

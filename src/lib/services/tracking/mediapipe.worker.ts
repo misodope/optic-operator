@@ -15,6 +15,44 @@ import type { LandmarkPoint } from '../../../types/tracking';
 let faceLandmarker: FaceLandmarker | null = null;
 let poseLandmarker: PoseLandmarker | null = null;
 
+const clampUnit = (value: number): number => Math.max(0, Math.min(1, value));
+
+const boundedRoi = (center: number, size: number): { start: number; end: number } => {
+  const boundedSize = Math.max(0.01, Math.min(1, size));
+  const start = clampUnit(center - boundedSize / 2);
+  const adjustedStart = Math.min(start, 1 - boundedSize);
+  return { start: adjustedStart, end: adjustedStart + boundedSize };
+};
+
+const faceRegionOfInterest = (
+  poseLandmarks: NormalizedLandmark[][],
+): { left: number; top: number; right: number; bottom: number } | undefined => {
+  const landmarks = poseLandmarks[0];
+  const nose = landmarks?.[0];
+  const leftShoulder = landmarks?.[11];
+  const rightShoulder = landmarks?.[12];
+
+  if (!nose || !leftShoulder || !rightShoulder) {
+    return undefined;
+  }
+
+  const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+  // A generous upper-body ROI makes the face larger to the detector when the
+  // creator is farther from the camera, while preserving enough headroom for
+  // pose noise and different body proportions.
+  const roiWidth = Math.max(0.22, Math.min(0.55, shoulderWidth * 1.35));
+  const roiHeight = Math.max(0.28, Math.min(0.6, roiWidth * 1.25));
+  const horizontal = boundedRoi(nose.x, roiWidth);
+  const vertical = boundedRoi(nose.y + roiHeight * 0.05, roiHeight);
+
+  return {
+    left: horizontal.start,
+    top: vertical.start,
+    right: horizontal.end,
+    bottom: vertical.end,
+  };
+};
+
 const copyLandmarks = (landmarks: NormalizedLandmark[][]): LandmarkPoint[][] =>
   landmarks.map((candidate) =>
     candidate.map((landmark) => ({
@@ -78,9 +116,9 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
         // The MVP follows one primary creator. Limiting the task to one face
         // reduces inference work and avoids switching between candidates.
         numFaces: 1,
-        minFaceDetectionConfidence: 0.3,
-        minFacePresenceConfidence: 0.3,
-        minTrackingConfidence: 0.3,
+        minFaceDetectionConfidence: 0.2,
+        minFacePresenceConfidence: 0.2,
+        minTrackingConfidence: 0.2,
         outputFaceBlendshapes: false,
         outputFacialTransformationMatrixes: false,
       });
@@ -112,13 +150,15 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
       throw new Error('MediaPipe tracker is not initialized.');
     }
 
-    const faceResult = faceLandmarker.detectForVideo(
-      request.frame,
-      request.timestampMs,
-    );
     const poseResult = poseLandmarker.detectForVideo(
       request.frame,
       request.timestampMs,
+    );
+    const faceRoi = faceRegionOfInterest(poseResult.landmarks);
+    const faceResult = faceLandmarker.detectForVideo(
+      request.frame,
+      request.timestampMs,
+      faceRoi ? { regionOfInterest: faceRoi } : undefined,
     );
     const result: SerializedDetectionResult = {
       type: 'result',

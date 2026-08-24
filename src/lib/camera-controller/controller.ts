@@ -41,8 +41,10 @@ const subjectTarget = (
     subject.shoulderCenterX !== null &&
     subject.shoulderCenterX !== undefined &&
     shoulderVisibility >= 0.5;
+  const shoulderX = clamp(subject.shoulderCenterX ?? faceX, 0, 1);
+  const faceWeight = subject.face && subject.face.confidence < 0.8 ? 0.35 : 0.55;
   const centeredX = hasReliableShoulders
-    ? faceX * 0.65 + clamp(subject.shoulderCenterX ?? faceX, 0, 1) * 0.35
+    ? faceX * faceWeight + shoulderX * (1 - faceWeight)
     : faceX;
   const currentCropHeight = cropSize.height / Math.max(1, zoom);
 
