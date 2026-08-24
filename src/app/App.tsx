@@ -277,7 +277,7 @@ export function App() {
     >
       <section className="hero-row">
         <div>
-          <p className="eyebrow">PHASE 2 / CAMERA INPUT</p>
+          <p className="eyebrow">PHASE 3 / VERTICAL RENDERER</p>
           <h2 className="hero-title">A quieter, smarter way to stay in frame.</h2>
           <p className="hero-copy">
             Connect the S9 through a clean HDMI capture path and see the actual source
@@ -300,7 +300,12 @@ export function App() {
           videoRef={videoRef}
           onReconnect={handleReconnect}
         />
-        <VerticalPreview preset={preset} />
+        <VerticalPreview
+          preset={preset}
+          sourceStatus={camera.status}
+          streamInfo={camera.streamInfo}
+          videoRef={videoRef}
+        />
       </section>
 
       <section className="control-grid">
@@ -318,7 +323,7 @@ export function App() {
       <footer className="footer-note">
         <span className="footer-mark">OO</span>
         <span>Local-first creator tooling · Built for the LUMIX S9</span>
-        <span>Phase 2 camera input</span>
+        <span>Phase 3 vertical renderer</span>
       </footer>
     </AppShell>
   );

@@ -381,6 +381,20 @@ select:focus-visible {
   box-shadow: 0 0 45px rgba(121, 182, 81, 0.07);
 }
 
+.vertical-preview-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.vertical-preview-canvas-visible {
+  opacity: 1;
+}
+
 .vertical-preview-lines {
   position: absolute;
   inset: 31% 0 auto;
@@ -401,6 +415,32 @@ select:focus-visible {
   color: #b6c6b2;
   font-size: 11px;
   font-weight: 600;
+}
+
+.vertical-preview-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+  color: #9db895;
+  font-size: 10px;
+}
+
+.vertical-preview-status span {
+  padding: 5px 7px;
+  border: 1px solid rgba(184, 220, 164, 0.17);
+  background: rgba(142, 200, 104, 0.06);
+}
+
+.vertical-preview-controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vertical-preview-controls .preview-caption {
+  flex: 1;
 }
 
 .preview-icon {

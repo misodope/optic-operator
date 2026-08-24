@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { CameraPreview } from './CameraPreview';
 import { DeviceSelector } from './DeviceSelector';
+import { VerticalPreview } from './VerticalPreview';
 import { initialCameraState } from '../../store/camera/state';
 import { useCameraStore } from '../../store/camera';
 
@@ -75,5 +76,37 @@ describe('camera input UI states', () => {
       />,
     );
     expect(errorMarkup).toContain('Capture device is busy.');
+  });
+
+  it('renders the vertical source placeholder until a stream is ready', () => {
+    const markup = renderToStaticMarkup(
+      <VerticalPreview
+        preset={{
+          id: 'talking-head',
+          label: 'Talking Head',
+          description: 'Stable framing.',
+          config: {
+            deadZoneX: 0.03,
+            deadZoneY: 0.03,
+            targetEyeY: 0.32,
+            preferredShoulderVisibility: 0.7,
+            maxPanSpeed: 0.4,
+            maxZoomSpeed: 0.2,
+            panResponseMs: 400,
+            zoomResponseMs: 800,
+            minQualityScale: 1,
+            minDetectionConfidence: 0.4,
+            lostSubjectHoldMs: 500,
+            lostSubjectWidenAfterMs: 1000,
+          },
+        }}
+        sourceStatus="idle"
+        streamInfo={null}
+        videoRef={{ current: null }}
+      />,
+    );
+
+    expect(markup).toContain('Waiting for a source');
+    expect(markup).toContain('9:16');
   });
 });

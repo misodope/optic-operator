@@ -2,9 +2,9 @@
 
 Optic Operator is an Electron + TypeScript desktop app for turning a fixed Panasonic LUMIX S9 into a smooth AI-assisted vertical camera operator.
 
-## Phase 2 status
+## Phase 3 status
 
-Phase 2 adds macOS camera and microphone enumeration, permission-aware setup, live raw-source preview, negotiated source metadata, reconnect behavior, and S9 hardware-validation notes. MediaPipe tracking, vertical crop rendering, and recording remain later phases.
+Phase 3 adds the live 9:16 canvas renderer, quality reporting, preset-aware camera-controller behavior, dead-zone smoothing, crop-boundary clamping, recentering, and deterministic controller/rendering tests. The current vertical preview uses a centered fixture until MediaPipe tracking is connected in Phase 4.
 
 ## Development
 

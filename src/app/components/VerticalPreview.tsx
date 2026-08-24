@@ -1,10 +1,103 @@
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+
+import { CameraController } from '../../lib/camera-controller';
+import {
+  renderVerticalCrop,
+  VERTICAL_OUTPUT,
+} from '../../lib/services/rendering/verticalCropRenderer';
+import type { CameraStatus, CameraStreamInfo } from '../../types/camera';
+import type { CameraControllerState } from '../../lib/camera-controller/types';
 import type { FramingPreset } from '../../types';
 
 interface VerticalPreviewProps {
   preset: FramingPreset;
+  sourceStatus: CameraStatus;
+  streamInfo: CameraStreamInfo | null;
+  videoRef: RefObject<HTMLVideoElement | null>;
 }
 
-export function VerticalPreview({ preset }: VerticalPreviewProps) {
+const QUALITY_LABELS: Record<CameraControllerState['qualityState'], string> = {
+  good: 'Good source quality',
+  caution: 'Quality caution',
+  'below-target': 'Below 1080 × 1920 target',
+};
+
+const TRACKING_LABELS: Record<CameraControllerState['trackingStatus'], string> = {
+  disabled: 'Tracking fixture centered',
+  tracking: 'Subject tracking',
+  'low-confidence': 'Tracking confidence low',
+  lost: 'Holding last subject position',
+};
+
+export function VerticalPreview({
+  preset,
+  sourceStatus,
+  streamInfo,
+  videoRef,
+}: VerticalPreviewProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const controllerRef = useRef<CameraController | null>(null);
+  const [controllerState, setControllerState] = useState<CameraControllerState | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+
+    if (!canvas || !video || sourceStatus !== 'ready' || !streamInfo) {
+      controllerRef.current = null;
+      setControllerState(null);
+      return undefined;
+    }
+
+    const controller = new CameraController();
+    controllerRef.current = controller;
+    let animationFrame = 0;
+    let lastPublishedAt = -Infinity;
+
+    const render = (nowMs: number): void => {
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        const nextState = controller.update({
+          subject: null,
+          source: { width: streamInfo.width, height: streamInfo.height },
+          output: VERTICAL_OUTPUT,
+          preset: preset.config,
+          nowMs,
+        });
+
+        renderVerticalCrop({
+          canvas,
+          source: video,
+          sourceDimensions: { width: streamInfo.width, height: streamInfo.height },
+          controllerState: nextState,
+          output: VERTICAL_OUTPUT,
+        });
+
+        if (nowMs - lastPublishedAt >= 100) {
+          lastPublishedAt = nowMs;
+          setControllerState(nextState);
+        }
+      }
+
+      animationFrame = requestAnimationFrame(render);
+    };
+
+    animationFrame = requestAnimationFrame(render);
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      controllerRef.current = null;
+    };
+  }, [preset, sourceStatus, streamInfo, videoRef]);
+
+  const recenter = useCallback((): void => {
+    controllerRef.current?.reset();
+    setControllerState(null);
+  }, []);
+
+  const hasSource = sourceStatus === 'ready' && streamInfo !== null;
+
   return (
     <section
       className="preview-card preview-card-vertical"
@@ -19,15 +112,44 @@ export function VerticalPreview({ preset }: VerticalPreviewProps) {
       </div>
       <div className="vertical-preview-wrap">
         <div className="vertical-preview">
+          <canvas
+            ref={canvasRef}
+            className={`vertical-preview-canvas ${hasSource ? 'vertical-preview-canvas-visible' : ''}`}
+            width={VERTICAL_OUTPUT.width}
+            height={VERTICAL_OUTPUT.height}
+            aria-label="Live 9:16 camera composition"
+          />
           <div className="vertical-preview-lines" />
-          <div className="vertical-preview-message">
-            <span className="preview-icon">✦</span>
-            <strong>Waiting for a source</strong>
-            <span>{preset.label} preset selected</span>
-          </div>
+          {!hasSource && (
+            <div className="vertical-preview-message">
+              <span className="preview-icon">✦</span>
+              <strong>Waiting for a source</strong>
+              <span>{preset.label} preset selected</span>
+            </div>
+          )}
         </div>
       </div>
-      <p className="preview-caption">Target export: 1080 × 1920 at 30 fps.</p>
+      {controllerState && (
+        <div className="vertical-preview-status">
+          <span>{QUALITY_LABELS[controllerState.qualityState]}</span>
+          <span>{TRACKING_LABELS[controllerState.trackingStatus]}</span>
+          <span>{controllerState.qualityScale.toFixed(2)}× source scale</span>
+        </div>
+      )}
+      <div className="vertical-preview-controls">
+        <p className="preview-caption">
+          Target export: 1080 × 1920 at 30 fps.
+          {streamInfo && ` Source: ${streamInfo.width} × ${streamInfo.height}.`}
+        </p>
+        <button
+          className="text-button"
+          type="button"
+          onClick={recenter}
+          disabled={!hasSource}
+        >
+          Recenter
+        </button>
+      </div>
     </section>
   );
 }

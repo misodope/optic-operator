@@ -5,6 +5,14 @@ export interface SubjectState {
   y: number;
   eyeY: number;
   shoulderWidth: number | null;
+  shoulderCenterX?: number | null;
+  shoulderCenterY?: number | null;
+  shoulderVisibility?: number;
+  faceWidth?: number | null;
+  faceHeight?: number | null;
+  lastSeenTimestampMs?: number | null;
+  lost?: boolean;
+  reacquired?: boolean;
   timestampMs: number;
 }
 
