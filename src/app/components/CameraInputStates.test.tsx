@@ -92,6 +92,7 @@ describe('camera input UI states', () => {
             preferredShoulderVisibility: 0.7,
             bodyFollowGain: 1,
             leftPanGain: 1,
+            leftPanSpeedMultiplier: 1,
             maxPanSpeed: 0.4,
             maxZoomSpeed: 0.2,
             panResponseMs: 400,

@@ -136,8 +136,12 @@ export class CameraController {
       { x: previous.cropCenterX, y: previous.cropCenterY },
       targetCropCenter,
       deltaMs,
-      preset.panResponseMs,
-      preset.maxPanSpeed,
+      targetCropCenter.x < previous.cropCenterX
+        ? preset.panResponseMs / Math.max(1, preset.leftPanSpeedMultiplier)
+        : preset.panResponseMs,
+      targetCropCenter.x < previous.cropCenterX
+        ? preset.maxPanSpeed * Math.max(1, preset.leftPanSpeedMultiplier)
+        : preset.maxPanSpeed,
     );
     const nextZoom = smoothTowards(
       previous.zoom,

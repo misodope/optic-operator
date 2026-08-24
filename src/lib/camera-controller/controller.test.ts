@@ -189,6 +189,7 @@ describe('camera controller', () => {
     });
 
     expect(0.5 - left.targetCropCenterX).toBeGreaterThan(right.targetCropCenterX - 0.5);
+    expect(0.5 - left.cropCenterX).toBeGreaterThan(right.cropCenterX - 0.5);
   });
 
   it('holds the last good state, then widens on tracking loss', () => {

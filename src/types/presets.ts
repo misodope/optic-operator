@@ -7,6 +7,7 @@ export interface FramingPresetConfig {
   preferredShoulderVisibility: number;
   bodyFollowGain: number;
   leftPanGain: number;
+  leftPanSpeedMultiplier: number;
   maxPanSpeed: number;
   maxZoomSpeed: number;
   panResponseMs: number;
@@ -36,6 +37,7 @@ export const FRAMING_PRESETS: FramingPreset[] = [
       preferredShoulderVisibility: 0.72,
       bodyFollowGain: 1,
       leftPanGain: 1,
+      leftPanSpeedMultiplier: 1,
       maxPanSpeed: 0.45,
       maxZoomSpeed: 0.18,
       panResponseMs: 420,
@@ -57,6 +59,7 @@ export const FRAMING_PRESETS: FramingPreset[] = [
       preferredShoulderVisibility: 0.62,
       bodyFollowGain: 1.35,
       leftPanGain: 1.6,
+      leftPanSpeedMultiplier: 1.75,
       maxPanSpeed: 0.85,
       maxZoomSpeed: 0.25,
       panResponseMs: 300,
@@ -78,6 +81,7 @@ export const FRAMING_PRESETS: FramingPreset[] = [
       preferredShoulderVisibility: 0.75,
       bodyFollowGain: 1,
       leftPanGain: 1,
+      leftPanSpeedMultiplier: 1,
       maxPanSpeed: 0.18,
       maxZoomSpeed: 0.08,
       panResponseMs: 1200,
