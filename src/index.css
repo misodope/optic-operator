@@ -639,7 +639,13 @@ select:focus-visible {
 .recording-light {
   width: 8px;
   height: 8px;
+  background: #718071;
   box-shadow: 0 0 0 4px rgba(120, 146, 108, 0.1);
+}
+
+.recording-light-active {
+  background: #e37f68;
+  box-shadow: 0 0 0 4px rgba(227, 127, 104, 0.14);
 }
 
 .record-button {
@@ -663,11 +669,37 @@ select:focus-visible {
   opacity: 0.5;
 }
 
+.record-button-stop {
+  border-color: rgba(227, 127, 104, 0.4);
+  background: rgba(227, 127, 104, 0.12);
+  color: #efaa95;
+}
+
+.record-button-stop .record-button-icon {
+  border-radius: 1px;
+  background: #e37f68;
+}
+
 .record-button-icon {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: #b4e67d;
+}
+
+.recording-cancel {
+  display: block;
+  margin: 11px auto 0;
+}
+
+.recording-output {
+  overflow: hidden;
+  margin: 12px 0 0;
+  color: #a9df79;
+  font-size: 10px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .footer-note {

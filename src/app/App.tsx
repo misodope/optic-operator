@@ -16,8 +16,14 @@ import {
   DEFAULT_MODEL_ASSETS,
   MediaPipeTracker,
 } from '../lib/services/tracking/mediapipe';
+import {
+  createCanvasRecorder,
+  selectRecordingMimeType,
+  type CanvasRecorder,
+} from '../lib/services/recording/recorder';
 import { useCameraStore } from '../store/camera';
 import { usePresetsStore } from '../store/presets';
+import { useRecordingStore } from '../store/recording';
 import { useSessionStore } from '../store/session';
 import type { PermissionKind } from '../types/camera';
 import { FRAMING_PRESETS } from '../types';
@@ -48,11 +54,17 @@ export function App() {
   const setStatus = useSessionStore((state) => state.setStatus);
   const setMessage = useSessionStore((state) => state.setMessage);
   const tracking = useSessionStore((state) => state.tracking);
+  const setRecording = useRecordingStore((state) => state.setRecording);
   const setTracking = useSessionStore((state) => state.setTracking);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const outputCanvasRef = useRef<HTMLCanvasElement>(null);
   const activeStreamRef = useRef<MediaStream | null>(null);
   const removeStreamListenerRef = useRef<(() => void) | null>(null);
   const trackerRef = useRef<MediaPipeTracker | null>(null);
+  const recorderRef = useRef<CanvasRecorder | null>(null);
+  const captureIdRef = useRef<string | null>(null);
+  const recordingStartedAtRef = useRef<number | null>(null);
+  const recordingTimerRef = useRef<number | null>(null);
 
   const preset = useMemo(
     () =>
@@ -239,6 +251,130 @@ export function App() {
     }
   }, [connectCamera, startSetup]);
 
+  const clearRecordingTimer = useCallback((): void => {
+    if (recordingTimerRef.current !== null) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }, []);
+
+  const handleStartRecording = useCallback(async (): Promise<void> => {
+    const canvas = outputCanvasRef.current;
+    if (
+      camera.status !== 'ready' ||
+      !camera.streamInfo ||
+      !canvas ||
+      recorderRef.current ||
+      captureIdRef.current
+    ) {
+      return;
+    }
+
+    setRecording({ status: 'preparing', elapsedMs: 0, outputPath: null, error: null });
+
+    let captureId: string | null = null;
+    try {
+      const mimeType = selectRecordingMimeType();
+      const capture = await window.opticOperator.recording.startCapture(mimeType);
+      captureId = capture.captureId;
+      captureIdRef.current = capture.captureId;
+
+      const recorder = createCanvasRecorder({
+        canvas,
+        mimeType,
+        audioTracks: activeStreamRef.current?.getAudioTracks(),
+        onChunk: async (chunk) => {
+          const data = new Uint8Array(await chunk.arrayBuffer());
+          await window.opticOperator.recording.appendCaptureChunk(
+            capture.captureId,
+            data,
+          );
+        },
+      });
+      recorder.start();
+      recorderRef.current = recorder;
+      recordingStartedAtRef.current = performance.now();
+      recordingTimerRef.current = window.setInterval(() => {
+        const startedAt = recordingStartedAtRef.current;
+        if (startedAt !== null) {
+          setRecording({ elapsedMs: performance.now() - startedAt });
+        }
+      }, 100);
+      setRecording({ status: 'recording' });
+    } catch (error: unknown) {
+      clearRecordingTimer();
+      recordingStartedAtRef.current = null;
+      recorderRef.current = null;
+      captureIdRef.current = null;
+      if (captureId) {
+        await window.opticOperator.recording
+          .cancelCapture(captureId)
+          .catch(() => undefined);
+      }
+      setRecording({
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, [camera.status, camera.streamInfo, clearRecordingTimer, setRecording]);
+
+  const handleStopRecording = useCallback(async (): Promise<void> => {
+    const recorder = recorderRef.current;
+    const captureId = captureIdRef.current;
+    if (!recorder || !captureId) {
+      return;
+    }
+
+    setRecording({ status: 'stopping' });
+    clearRecordingTimer();
+    recordingStartedAtRef.current = null;
+
+    try {
+      await recorder.stop();
+      const outputPath = await window.opticOperator.recording.finishCapture(captureId);
+      setRecording({ status: 'complete', outputPath, error: null });
+    } catch (error: unknown) {
+      await window.opticOperator.recording
+        .cancelCapture(captureId)
+        .catch(() => undefined);
+      setRecording({
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      recorderRef.current = null;
+      captureIdRef.current = null;
+    }
+  }, [clearRecordingTimer, setRecording]);
+
+  const handleCancelRecording = useCallback(async (): Promise<void> => {
+    const recorder = recorderRef.current;
+    const captureId = captureIdRef.current;
+    if (!recorder && !captureId) {
+      return;
+    }
+
+    setRecording({ status: 'stopping' });
+    clearRecordingTimer();
+    recordingStartedAtRef.current = null;
+
+    try {
+      await recorder?.cancel();
+      if (captureId) {
+        await window.opticOperator.recording.cancelCapture(captureId);
+      }
+      setRecording({ status: 'idle', elapsedMs: 0, outputPath: null, error: null });
+    } catch (error: unknown) {
+      setRecording({
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      recorderRef.current = null;
+      captureIdRef.current = null;
+    }
+  }, [clearRecordingTimer, setRecording]);
+
   useEffect(() => {
     const video = videoRef.current;
     const streamInfo = camera.streamInfo;
@@ -373,7 +509,7 @@ export function App() {
     >
       <section className="hero-row">
         <div>
-          <p className="eyebrow">PHASE 4 / LIVE TRACKING</p>
+          <p className="eyebrow">PHASE 5 / RECORDING CAPTURE</p>
           <h2 className="hero-title">A quieter, smarter way to stay in frame.</h2>
           <p className="hero-copy">
             Connect the S9 directly or route it through OBS Virtual Camera and see the
@@ -406,6 +542,7 @@ export function App() {
           sourceStatus={camera.status}
           streamInfo={camera.streamInfo}
           videoRef={videoRef}
+          canvasRef={outputCanvasRef}
           subject={tracking.subject}
           trackingStatus={tracking.status}
           trackingError={tracking.error}
@@ -421,13 +558,18 @@ export function App() {
           onReconnect={handleReconnect}
         />
         <PresetSelector />
-        <RecordingControls />
+        <RecordingControls
+          canStart={camera.status === 'ready' && camera.streamInfo !== null}
+          onStart={handleStartRecording}
+          onStop={handleStopRecording}
+          onCancel={handleCancelRecording}
+        />
       </section>
 
       <footer className="footer-note">
         <span className="footer-mark">OO</span>
         <span>Local-first creator tooling · Built for the LUMIX S9</span>
-        <span>Phase 4 live tracking</span>
+        <span>Phase 5 recording capture</span>
       </footer>
     </AppShell>
   );

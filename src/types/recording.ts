@@ -7,3 +7,8 @@ export interface RecordingState {
   outputPath: string | null;
   error: string | null;
 }
+
+export interface RecordingCaptureHandle {
+  captureId: string;
+  outputPath: string;
+}

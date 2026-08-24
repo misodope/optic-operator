@@ -16,6 +16,7 @@ interface VerticalPreviewProps {
   sourceStatus: CameraStatus;
   streamInfo: CameraStreamInfo | null;
   videoRef: RefObject<HTMLVideoElement | null>;
+  canvasRef?: RefObject<HTMLCanvasElement | null>;
   subject?: SubjectState | null;
   trackingStatus?: RuntimeTrackingStatus;
   trackingError?: string | null;
@@ -41,11 +42,13 @@ export function VerticalPreview({
   sourceStatus,
   streamInfo,
   videoRef,
+  canvasRef: outputCanvasRef,
   subject = null,
   trackingStatus = 'disabled',
   trackingError = null,
 }: VerticalPreviewProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const internalCanvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = outputCanvasRef ?? internalCanvasRef;
   const controllerRef = useRef<CameraController | null>(null);
   const subjectRef = useRef<SubjectState | null>(subject);
   const [controllerState, setControllerState] = useState<CameraControllerState | null>(

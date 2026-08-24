@@ -13,6 +13,13 @@ const opticOperatorApi: OpticOperatorApi = {
   },
   recording: {
     getState: () => ipcRenderer.invoke('recording:get-state'),
+    startCapture: (mimeType) => ipcRenderer.invoke('recording:start-capture', mimeType),
+    appendCaptureChunk: (captureId, chunk) =>
+      ipcRenderer.invoke('recording:append-capture-chunk', captureId, chunk),
+    finishCapture: (captureId) =>
+      ipcRenderer.invoke('recording:finish-capture', captureId),
+    cancelCapture: (captureId) =>
+      ipcRenderer.invoke('recording:cancel-capture', captureId),
   },
   files: {
     getDefaultSessionDirectory: () =>

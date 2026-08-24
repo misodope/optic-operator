@@ -4,6 +4,7 @@ export * from './recording';
 export * from './tracking';
 
 import type { MediaPermissionState } from './camera';
+import type { RecordingCaptureHandle, RecordingState } from './recording';
 
 export interface OpticOperatorApi {
   app: {
@@ -21,6 +22,10 @@ export interface OpticOperatorApi {
   };
   recording: {
     getState: () => Promise<RecordingState>;
+    startCapture: (mimeType: string) => Promise<RecordingCaptureHandle>;
+    appendCaptureChunk: (captureId: string, chunk: Uint8Array) => Promise<void>;
+    finishCapture: (captureId: string) => Promise<string>;
+    cancelCapture: (captureId: string) => Promise<void>;
   };
   files: {
     getDefaultSessionDirectory: () => Promise<string>;
