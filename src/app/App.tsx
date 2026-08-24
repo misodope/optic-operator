@@ -15,7 +15,6 @@ import {
 import {
   DEFAULT_MODEL_ASSETS,
   MediaPipeTracker,
-  resolveLocalModelAssets,
 } from '../lib/services/tracking/mediapipe';
 import { useCameraStore } from '../store/camera';
 import { usePresetsStore } from '../store/presets';
@@ -287,7 +286,7 @@ export function App() {
     let tracker: MediaPipeTracker;
     try {
       tracker = new MediaPipeTracker({
-        modelAssets: resolveLocalModelAssets(DEFAULT_MODEL_ASSETS),
+        modelAssets: DEFAULT_MODEL_ASSETS,
         onResult: ({ diagnostics }) => {
           if (active) {
             setTracking(diagnostics);
