@@ -370,8 +370,9 @@ select:focus-visible {
 .vertical-preview {
   position: relative;
   display: grid;
-  width: 166px;
-  height: 296px;
+  width: min(100%, 240px);
+  height: auto;
+  aspect-ratio: 9 / 16;
   overflow: hidden;
   place-items: center;
   border: 1px solid rgba(177, 220, 148, 0.3);
