@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 import { useRecordingStore } from '../../store/recording';
 
 interface RecordingControlsProps {
@@ -5,6 +7,7 @@ interface RecordingControlsProps {
   onStart: () => void;
   onStop: () => void;
   onCancel: () => void;
+  onReveal: (outputPath: string) => void;
 }
 
 const formatElapsed = (elapsedMs: number): string => {
@@ -38,13 +41,32 @@ export function RecordingControls({
   onStart,
   onStop,
   onCancel,
+  onReveal,
 }: RecordingControlsProps) {
   const status = useRecordingStore((state) => state.recording.status);
   const elapsedMs = useRecordingStore((state) => state.recording.elapsedMs);
   const outputPath = useRecordingStore((state) => state.recording.outputPath);
   const error = useRecordingStore((state) => state.recording.error);
+  const [pathCopied, setPathCopied] = useState(false);
   const isRecording = status === 'recording';
   const isBusy = status === 'preparing' || status === 'stopping';
+
+  useEffect(() => {
+    setPathCopied(false);
+  }, [outputPath]);
+
+  const copyOutputPath = async (): Promise<void> => {
+    if (!outputPath) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(outputPath);
+      setPathCopied(true);
+    } catch {
+      setPathCopied(false);
+    }
+  };
 
   return (
     <section
@@ -86,7 +108,30 @@ export function RecordingControls({
           Cancel capture
         </button>
       )}
-      {outputPath && <p className="recording-output">Saved: {outputPath}</p>}
+      {outputPath && (
+        <div className="recording-output">
+          <span className="recording-output-label">Saved recording</span>
+          <code className="recording-output-path" title={outputPath}>
+            {outputPath}
+          </code>
+          <div className="recording-output-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => void copyOutputPath()}
+            >
+              {pathCopied ? 'Copied' : 'Copy path'}
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => onReveal(outputPath)}
+            >
+              Show in Finder
+            </button>
+          </div>
+        </div>
+      )}
       {error ? (
         <p className="error-message" role="alert">
           {error}

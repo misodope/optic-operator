@@ -29,5 +29,6 @@ export interface OpticOperatorApi {
   };
   files: {
     getDefaultSessionDirectory: () => Promise<string>;
+    revealInFinder: (filePath: string) => Promise<void>;
   };
 }

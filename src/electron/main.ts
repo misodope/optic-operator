@@ -3,6 +3,7 @@ import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
 import { registerDeviceIpcHandlers } from './ipc/devices';
+import { registerFilesIpcHandlers } from './ipc/files';
 import { registerRecordingIpcHandlers } from './ipc/recording';
 
 if (started) {
@@ -11,12 +12,10 @@ if (started) {
 
 const IPC_CHANNELS = {
   getVersion: 'app:get-version',
-  getDefaultSessionDirectory: 'files:get-default-session-directory',
 } as const;
 
 const registerIpcHandlers = (): void => {
   ipcMain.handle(IPC_CHANNELS.getVersion, () => app.getVersion());
-  ipcMain.handle(IPC_CHANNELS.getDefaultSessionDirectory, () => app.getPath('videos'));
 };
 
 const createWindow = (): void => {
@@ -53,6 +52,7 @@ const createWindow = (): void => {
 app.whenReady().then(() => {
   registerIpcHandlers();
   registerDeviceIpcHandlers();
+  registerFilesIpcHandlers();
   registerRecordingIpcHandlers();
   createWindow();
 });

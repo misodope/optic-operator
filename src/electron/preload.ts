@@ -24,6 +24,8 @@ const opticOperatorApi: OpticOperatorApi = {
   files: {
     getDefaultSessionDirectory: () =>
       ipcRenderer.invoke('files:get-default-session-directory'),
+    revealInFinder: (filePath) =>
+      ipcRenderer.invoke('files:reveal-in-finder', filePath),
   },
 };
 

@@ -375,6 +375,20 @@ export function App() {
     }
   }, [clearRecordingTimer, setRecording]);
 
+  const handleRevealRecording = useCallback(
+    (outputPath: string): void => {
+      void window.opticOperator.files
+        .revealInFinder(outputPath)
+        .catch((error: unknown) => {
+          setRecording({
+            status: 'failed',
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+    },
+    [setRecording],
+  );
+
   useEffect(() => {
     const video = videoRef.current;
     const streamInfo = camera.streamInfo;
@@ -563,6 +577,7 @@ export function App() {
           onStart={handleStartRecording}
           onStop={handleStopRecording}
           onCancel={handleCancelRecording}
+          onReveal={handleRevealRecording}
         />
       </section>
 
