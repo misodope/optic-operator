@@ -381,7 +381,6 @@ export function App() {
         .revealInFinder(outputPath)
         .catch((error: unknown) => {
           setRecording({
-            status: 'failed',
             error: error instanceof Error ? error.message : String(error),
           });
         });
