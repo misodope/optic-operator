@@ -32,14 +32,42 @@ const closeLandmarkers = (): void => {
   poseLandmarker = null;
 };
 
+const ensureModuleFactory = async (wasmPath: string): Promise<void> => {
+  const loaderUrl = new URL(
+    'vision_wasm_module_internal.js',
+    `${wasmPath.replace(/\/$/, '')}/`,
+  );
+  const module = (await import(/* @vite-ignore */ loaderUrl.href)) as {
+    default?: unknown;
+  };
+  const workerGlobal = globalThis as typeof globalThis & {
+    ModuleFactory?: unknown;
+  };
+  const factory = module.default ?? workerGlobal.ModuleFactory;
+
+  if (typeof factory !== 'function') {
+    throw new Error(
+      `The MediaPipe WASM loader did not expose ModuleFactory from ${loaderUrl.href}.`,
+    );
+  }
+
+  workerGlobal.ModuleFactory = factory;
+};
+
 const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => {
+  let phase = 'starting MediaPipe';
+
   try {
     if (request.type === 'init') {
       closeLandmarkers();
       // The worker itself is an ES module. Use MediaPipe's module loader so the
       // WASM factory is registered in this worker rather than relying on the
       // CommonJS/UMD loader path.
+      phase = 'loading MediaPipe WASM loader';
+      await ensureModuleFactory(request.assets.wasm);
+      phase = 'resolving MediaPipe WASM files';
       const vision = await FilesetResolver.forVisionTasks(request.assets.wasm, true);
+      phase = 'loading face model';
       faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
         baseOptions: { modelAssetPath: request.assets.face },
         runningMode: 'VIDEO',
@@ -50,6 +78,7 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
         outputFaceBlendshapes: false,
         outputFacialTransformationMatrixes: false,
       });
+      phase = 'loading pose model';
       poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: { modelAssetPath: request.assets.pose },
         runningMode: 'VIDEO',
@@ -59,6 +88,7 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
         minTrackingConfidence: 0.4,
         outputSegmentationMasks: false,
       });
+      phase = 'running inference';
       self.postMessage({ type: 'ready' } satisfies MediaPipeWorkerResponse);
       return;
     }
@@ -96,7 +126,7 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
     }
     self.postMessage({
       type: 'error',
-      message: error instanceof Error ? error.message : String(error),
+      message: `${phase}: ${error instanceof Error ? error.message : String(error)}`,
       ...(request.type === 'detect' ? { requestId: request.requestId } : {}),
     } satisfies MediaPipeWorkerResponse);
   }
