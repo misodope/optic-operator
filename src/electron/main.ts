@@ -40,6 +40,13 @@ const createWindow = (): void => {
     },
   });
 
+  mainWindow.webContents.on(
+    'console-message',
+    (_event, level, message, line, sourceId) => {
+      console.log(`[renderer:${level}] ${message} (${sourceId}:${line})`);
+    },
+  );
+
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {

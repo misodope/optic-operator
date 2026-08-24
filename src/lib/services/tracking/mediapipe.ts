@@ -354,6 +354,7 @@ export class MediaPipeTracker {
 
   private reportError(error: unknown): void {
     const normalized = error instanceof Error ? error : new Error(String(error));
+    console.error(`[MediaPipeTracker] ${normalized.message}`);
     this.onError?.(normalized);
   }
 }
