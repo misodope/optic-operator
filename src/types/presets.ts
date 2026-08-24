@@ -6,6 +6,7 @@ export interface FramingPresetConfig {
   targetEyeY: number;
   preferredShoulderVisibility: number;
   bodyFollowGain: number;
+  leftPanGain: number;
   maxPanSpeed: number;
   maxZoomSpeed: number;
   panResponseMs: number;
@@ -34,6 +35,7 @@ export const FRAMING_PRESETS: FramingPreset[] = [
       targetEyeY: 0.32,
       preferredShoulderVisibility: 0.72,
       bodyFollowGain: 1,
+      leftPanGain: 1,
       maxPanSpeed: 0.45,
       maxZoomSpeed: 0.18,
       panResponseMs: 420,
@@ -49,11 +51,12 @@ export const FRAMING_PRESETS: FramingPreset[] = [
     label: 'Walk & Talk',
     description: 'More responsive framing with wider safety margins for movement.',
     config: {
-      deadZoneX: 0.035,
+      deadZoneX: 0.02,
       deadZoneY: 0.05,
       targetEyeY: 0.34,
       preferredShoulderVisibility: 0.62,
       bodyFollowGain: 1.35,
+      leftPanGain: 1.6,
       maxPanSpeed: 0.85,
       maxZoomSpeed: 0.25,
       panResponseMs: 300,
@@ -74,6 +77,7 @@ export const FRAMING_PRESETS: FramingPreset[] = [
       targetEyeY: 0.32,
       preferredShoulderVisibility: 0.75,
       bodyFollowGain: 1,
+      leftPanGain: 1,
       maxPanSpeed: 0.18,
       maxZoomSpeed: 0.08,
       panResponseMs: 1200,

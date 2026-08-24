@@ -95,7 +95,20 @@ export class CameraController {
 
     if (trackable && subject) {
       const nextZoom = calculateTargetZoom(subject, preset, baseCrop, targetZoomLimit);
-      targetCropCenter = subjectTarget(subject, preset, baseCrop, nextZoom);
+      const subjectTargetCenter = subjectTarget(subject, preset, baseCrop, nextZoom);
+      const leftPanGain = Math.max(1, preset.leftPanGain);
+      targetCropCenter = {
+        x:
+          subjectTargetCenter.x < previous.cropCenterX
+            ? clamp(
+                previous.cropCenterX +
+                  (subjectTargetCenter.x - previous.cropCenterX) * leftPanGain,
+                0,
+                1,
+              )
+            : subjectTargetCenter.x,
+        y: subjectTargetCenter.y,
+      };
       targetCropCenter = applyDeadZone(
         { x: previous.cropCenterX, y: previous.cropCenterY },
         targetCropCenter,

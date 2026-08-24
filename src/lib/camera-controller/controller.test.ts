@@ -149,6 +149,48 @@ describe('camera controller', () => {
     expect(state.targetCropCenterX).toBeLessThan(0.47);
   });
 
+  it('gives Walk & Talk an extra leftward response without a permanent left bias', () => {
+    const walkAndTalk = FRAMING_PRESETS.find(
+      (candidate) => candidate.id === 'walk-and-talk',
+    )?.config;
+
+    expect(walkAndTalk).toBeDefined();
+
+    const leftController = new CameraController();
+    const rightController = new CameraController();
+    leftController.update({
+      subject: subject(0),
+      source,
+      output,
+      preset: walkAndTalk!,
+      nowMs: 0,
+    });
+    rightController.update({
+      subject: subject(0),
+      source,
+      output,
+      preset: walkAndTalk!,
+      nowMs: 0,
+    });
+
+    const left = leftController.update({
+      subject: subject(33, { x: 0.35, shoulderCenterX: 0.35 }),
+      source,
+      output,
+      preset: walkAndTalk!,
+      nowMs: 33,
+    });
+    const right = rightController.update({
+      subject: subject(33, { x: 0.65, shoulderCenterX: 0.65 }),
+      source,
+      output,
+      preset: walkAndTalk!,
+      nowMs: 33,
+    });
+
+    expect(0.5 - left.targetCropCenterX).toBeGreaterThan(right.targetCropCenterX - 0.5);
+  });
+
   it('holds the last good state, then widens on tracking loss', () => {
     const controller = new CameraController();
     controller.update({ subject: subject(0), source, output, preset, nowMs: 0 });
