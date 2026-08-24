@@ -79,6 +79,9 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
         outputFacialTransformationMatrixes: false,
       });
       phase = 'loading pose model';
+      // MediaPipe consumes and clears the global factory after creating a task.
+      // Re-register it before creating the second task in this worker.
+      await ensureModuleFactory(request.assets.wasm);
       poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: { modelAssetPath: request.assets.pose },
         runningMode: 'VIDEO',
