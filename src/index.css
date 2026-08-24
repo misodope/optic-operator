@@ -397,8 +397,66 @@ select:focus-visible {
 
 .vertical-preview-lines {
   position: absolute;
+  z-index: 1;
   inset: 31% 0 auto;
   border-top: 1px dashed rgba(172, 220, 138, 0.24);
+}
+
+.tracking-overlay {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.tracking-box {
+  vector-effect: non-scaling-stroke;
+  fill: transparent;
+  stroke-width: 1.5px;
+}
+
+.tracking-box-face {
+  fill: rgba(169, 223, 121, 0.08);
+  stroke: #a9df79;
+}
+
+.tracking-box-shoulders {
+  fill: rgba(112, 186, 220, 0.05);
+  stroke: #70badc;
+  stroke-dasharray: 4 3;
+}
+
+.tracking-eye {
+  vector-effect: non-scaling-stroke;
+  fill: #f7d37b;
+  stroke: #111512;
+  stroke-width: 1.5px;
+}
+
+.tracking-overlay-label {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  color: #d9e8d1;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  background: rgba(8, 10, 8, 0.72);
+  border: 1px solid rgba(169, 223, 121, 0.35);
+}
+
+.tracking-overlay-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #a9df79;
+  box-shadow: 0 0 8px rgba(169, 223, 121, 0.8);
 }
 
 .vertical-preview-message {

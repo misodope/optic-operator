@@ -9,6 +9,7 @@ import type { CameraStatus, CameraStreamInfo } from '../../types/camera';
 import type { CameraControllerState } from '../../lib/camera-controller/types';
 import type { FramingPreset } from '../../types';
 import type { RuntimeTrackingStatus, SubjectState } from '../../types/tracking';
+import { TrackingOverlay } from './TrackingOverlay';
 
 interface VerticalPreviewProps {
   preset: FramingPreset;
@@ -134,6 +135,11 @@ export function VerticalPreview({
             aria-label="Live 9:16 camera composition"
           />
           <div className="vertical-preview-lines" />
+          <TrackingOverlay
+            subject={subject}
+            controllerState={controllerState}
+            trackingStatus={trackingStatus}
+          />
           {!hasSource && (
             <div className="vertical-preview-message">
               <span className="preview-icon">✦</span>
