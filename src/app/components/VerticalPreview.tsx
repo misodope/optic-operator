@@ -8,12 +8,15 @@ import {
 import type { CameraStatus, CameraStreamInfo } from '../../types/camera';
 import type { CameraControllerState } from '../../lib/camera-controller/types';
 import type { FramingPreset } from '../../types';
+import type { RuntimeTrackingStatus, SubjectState } from '../../types/tracking';
 
 interface VerticalPreviewProps {
   preset: FramingPreset;
   sourceStatus: CameraStatus;
   streamInfo: CameraStreamInfo | null;
   videoRef: RefObject<HTMLVideoElement | null>;
+  subject?: SubjectState | null;
+  trackingStatus?: RuntimeTrackingStatus;
 }
 
 const QUALITY_LABELS: Record<CameraControllerState['qualityState'], string> = {
@@ -22,11 +25,13 @@ const QUALITY_LABELS: Record<CameraControllerState['qualityState'], string> = {
   'below-target': 'Below 1080 × 1920 target',
 };
 
-const TRACKING_LABELS: Record<CameraControllerState['trackingStatus'], string> = {
-  disabled: 'Tracking fixture centered',
+const TRACKING_LABELS: Record<RuntimeTrackingStatus, string> = {
+  disabled: 'Tracking disabled',
+  initializing: 'Initializing MediaPipe',
   tracking: 'Subject tracking',
   'low-confidence': 'Tracking confidence low',
   lost: 'Holding last subject position',
+  error: 'Tracking unavailable',
 };
 
 export function VerticalPreview({
@@ -34,12 +39,19 @@ export function VerticalPreview({
   sourceStatus,
   streamInfo,
   videoRef,
+  subject = null,
+  trackingStatus = 'disabled',
 }: VerticalPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const controllerRef = useRef<CameraController | null>(null);
+  const subjectRef = useRef<SubjectState | null>(subject);
   const [controllerState, setControllerState] = useState<CameraControllerState | null>(
     null,
   );
+
+  useEffect(() => {
+    subjectRef.current = subject;
+  }, [subject]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -59,7 +71,7 @@ export function VerticalPreview({
     const render = (nowMs: number): void => {
       if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
         const nextState = controller.update({
-          subject: null,
+          subject: subjectRef.current,
           source: { width: streamInfo.width, height: streamInfo.height },
           output: VERTICAL_OUTPUT,
           preset: preset.config,
@@ -132,7 +144,7 @@ export function VerticalPreview({
       {controllerState && (
         <div className="vertical-preview-status">
           <span>{QUALITY_LABELS[controllerState.qualityState]}</span>
-          <span>{TRACKING_LABELS[controllerState.trackingStatus]}</span>
+          <span>{TRACKING_LABELS[trackingStatus]}</span>
           <span>{controllerState.qualityScale.toFixed(2)}× source scale</span>
         </div>
       )}

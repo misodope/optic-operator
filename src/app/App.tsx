@@ -12,6 +12,11 @@ import {
   openCameraStream,
   stopMediaStream,
 } from '../lib/services/camera/stream';
+import {
+  DEFAULT_MODEL_ASSETS,
+  MediaPipeTracker,
+  resolveLocalModelAssets,
+} from '../lib/services/tracking/mediapipe';
 import { useCameraStore } from '../store/camera';
 import { usePresetsStore } from '../store/presets';
 import { useSessionStore } from '../store/session';
@@ -43,9 +48,12 @@ export function App() {
   const setAppVersion = useSessionStore((state) => state.setAppVersion);
   const setStatus = useSessionStore((state) => state.setStatus);
   const setMessage = useSessionStore((state) => state.setMessage);
+  const tracking = useSessionStore((state) => state.tracking);
+  const setTracking = useSessionStore((state) => state.setTracking);
   const videoRef = useRef<HTMLVideoElement>(null);
   const activeStreamRef = useRef<MediaStream | null>(null);
   const removeStreamListenerRef = useRef<(() => void) | null>(null);
+  const trackerRef = useRef<MediaPipeTracker | null>(null);
 
   const preset = useMemo(
     () =>
@@ -233,6 +241,95 @@ export function App() {
   }, [connectCamera, startSetup]);
 
   useEffect(() => {
+    const video = videoRef.current;
+    const streamInfo = camera.streamInfo;
+
+    trackerRef.current?.dispose();
+    trackerRef.current = null;
+
+    if (camera.status !== 'ready' || !streamInfo || !video) {
+      setTracking({
+        status: 'disabled',
+        confidence: 0,
+        subject: null,
+        lastResultTimestampMs: null,
+        inferenceFps: 0,
+        staleResultsDropped: 0,
+        faceLandmarkCount: 0,
+        poseLandmarkCount: 0,
+        error: null,
+      });
+      return undefined;
+    }
+
+    let active = true;
+    let trackingInterval: number | null = null;
+    const setTrackingError = (message: string): void => {
+      if (!active) {
+        return;
+      }
+      const current = useSessionStore.getState().tracking;
+      setTracking({ ...current, status: 'error', error: message });
+    };
+
+    setTracking({
+      status: 'initializing',
+      confidence: 0,
+      subject: null,
+      lastResultTimestampMs: null,
+      inferenceFps: 0,
+      staleResultsDropped: 0,
+      faceLandmarkCount: 0,
+      poseLandmarkCount: 0,
+      error: null,
+    });
+
+    let tracker: MediaPipeTracker;
+    try {
+      tracker = new MediaPipeTracker({
+        modelAssets: resolveLocalModelAssets(DEFAULT_MODEL_ASSETS),
+        onResult: ({ diagnostics }) => {
+          if (active) {
+            setTracking(diagnostics);
+          }
+        },
+        onError: (error) => setTrackingError(error.message),
+      });
+    } catch (error) {
+      setTrackingError(error instanceof Error ? error.message : String(error));
+      return undefined;
+    }
+
+    trackerRef.current = tracker;
+    void tracker
+      .initialize()
+      .then(() => {
+        if (!active) {
+          return;
+        }
+        trackingInterval = window.setInterval(() => {
+          if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            tracker.submitVideoFrame(video, performance.now());
+          }
+        }, 1000 / 12);
+      })
+      .catch((error: unknown) => {
+        setTrackingError(error instanceof Error ? error.message : String(error));
+      });
+
+    return () => {
+      active = false;
+      if (trackingInterval !== null) {
+        window.clearInterval(trackingInterval);
+      }
+      tracker.dispose();
+      if (trackerRef.current === tracker) {
+        trackerRef.current = null;
+      }
+    };
+  }, [camera.status, camera.streamInfo, setTracking]);
+
+  useEffect(() => {
     let active = true;
     const mediaDevices = getMediaDevices();
 
@@ -277,17 +374,17 @@ export function App() {
     >
       <section className="hero-row">
         <div>
-          <p className="eyebrow">PHASE 3 / VERTICAL RENDERER</p>
+          <p className="eyebrow">PHASE 4 / LIVE TRACKING</p>
           <h2 className="hero-title">A quieter, smarter way to stay in frame.</h2>
           <p className="hero-copy">
-            Connect the S9 through a clean HDMI capture path and see the actual source
-            mode negotiated by macOS before recording.
+            Connect the S9 directly or route it through OBS Virtual Camera and see the
+            actual source mode negotiated by macOS before recording.
           </p>
         </div>
         <div className="hero-note">
           <span className="hero-note-label">SOURCE TARGET</span>
-          <strong>S9 → HDMI capture → Mac</strong>
-          <span>Requested input: 3840 × 2160 / 30 fps</span>
+          <strong>S9 / OBS Virtual Camera → Mac</strong>
+          <span>Current working input: 1920 × 1080 / 30 fps</span>
         </div>
       </section>
 
@@ -299,12 +396,16 @@ export function App() {
           error={camera.error}
           videoRef={videoRef}
           onReconnect={handleReconnect}
+          trackingStatus={tracking.status}
+          trackingConfidence={tracking.confidence}
         />
         <VerticalPreview
           preset={preset}
           sourceStatus={camera.status}
           streamInfo={camera.streamInfo}
           videoRef={videoRef}
+          subject={tracking.subject}
+          trackingStatus={tracking.status}
         />
       </section>
 
@@ -323,7 +424,7 @@ export function App() {
       <footer className="footer-note">
         <span className="footer-mark">OO</span>
         <span>Local-first creator tooling · Built for the LUMIX S9</span>
-        <span>Phase 3 vertical renderer</span>
+        <span>Phase 4 live tracking</span>
       </footer>
     </AppShell>
   );

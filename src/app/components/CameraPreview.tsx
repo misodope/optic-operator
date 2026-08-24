@@ -2,6 +2,7 @@ import type { RefObject } from 'react';
 
 import type { CameraError, CameraStatus, CameraStreamInfo } from '../../types/camera';
 import { formatAspectRatio, isLowResolution } from '../../lib/utils/aspectRatio';
+import type { RuntimeTrackingStatus } from '../../types/tracking';
 
 interface CameraPreviewProps {
   deviceLabel: string | null;
@@ -10,6 +11,8 @@ interface CameraPreviewProps {
   error: CameraError | null;
   videoRef: RefObject<HTMLVideoElement | null>;
   onReconnect: () => void;
+  trackingStatus?: RuntimeTrackingStatus;
+  trackingConfidence?: number;
 }
 
 const formatFrameRate = (frameRate: number | null): string =>
@@ -22,6 +25,8 @@ export function CameraPreview({
   error,
   videoRef,
   onReconnect,
+  trackingStatus = 'disabled',
+  trackingConfidence = 0,
 }: CameraPreviewProps) {
   const hasSource = status === 'ready' && streamInfo !== null;
   const lowResolution = streamInfo
@@ -65,7 +70,7 @@ export function CameraPreview({
                 ? 'Waiting for the selected source to report its video mode.'
                 : status === 'permission-required'
                   ? 'Allow camera access in macOS System Settings, then reconnect the source.'
-                  : 'Connect the LUMIX S9 through an HDMI capture card to begin.'}
+                  : 'Connect the LUMIX S9 directly or choose OBS Virtual Camera to begin.'}
             </span>
             {(status === 'error' || status === 'disconnected') && (
               <button className="secondary-button" type="button" onClick={onReconnect}>
@@ -82,6 +87,12 @@ export function CameraPreview({
           </span>
           <span>{formatFrameRate(streamInfo.frameRate)}</span>
           <span>{formatAspectRatio(streamInfo.aspectRatio)}</span>
+        </div>
+      )}
+      {hasSource && (
+        <div className="source-metadata" aria-label="Tracking metadata">
+          <span>{trackingStatus.replace('-', ' ')}</span>
+          <span>{Math.round(trackingConfidence * 100)}% confidence</span>
         </div>
       )}
       {lowResolution && (
