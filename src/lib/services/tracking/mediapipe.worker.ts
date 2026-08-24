@@ -36,7 +36,10 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
   try {
     if (request.type === 'init') {
       closeLandmarkers();
-      const vision = await FilesetResolver.forVisionTasks(request.assets.wasm);
+      // The worker itself is an ES module. Use MediaPipe's module loader so the
+      // WASM factory is registered in this worker rather than relying on the
+      // CommonJS/UMD loader path.
+      const vision = await FilesetResolver.forVisionTasks(request.assets.wasm, true);
       faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
         baseOptions: { modelAssetPath: request.assets.face },
         runningMode: 'VIDEO',
