@@ -14,6 +14,8 @@ interface CameraPreviewProps {
   trackingStatus?: RuntimeTrackingStatus;
   trackingConfidence?: number;
   trackingError?: string | null;
+  faceLandmarkCount?: number;
+  poseLandmarkCount?: number;
 }
 
 const formatFrameRate = (frameRate: number | null): string =>
@@ -29,6 +31,8 @@ export function CameraPreview({
   trackingStatus = 'disabled',
   trackingConfidence = 0,
   trackingError = null,
+  faceLandmarkCount = 0,
+  poseLandmarkCount = 0,
 }: CameraPreviewProps) {
   const hasSource = status === 'ready' && streamInfo !== null;
   const lowResolution = streamInfo
@@ -95,6 +99,8 @@ export function CameraPreview({
         <div className="source-metadata" aria-label="Tracking metadata">
           <span>{trackingStatus.replace('-', ' ')}</span>
           <span>{Math.round(trackingConfidence * 100)}% confidence</span>
+          <span>Face {faceLandmarkCount}</span>
+          <span>Pose {poseLandmarkCount}</span>
         </div>
       )}
       {hasSource && trackingError && (

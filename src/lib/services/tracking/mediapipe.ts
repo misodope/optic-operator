@@ -146,6 +146,10 @@ export class MediaPipeTracker {
 
   private firstResultAtMs: number | null = null;
 
+  private lastReportedFaceLandmarkCount = -1;
+
+  private lastReportedPoseLandmarkCount = -1;
+
   private readonly handleMessageBound = (
     event: MessageEvent<MediaPipeWorkerResponse>,
   ): void => {
@@ -347,6 +351,20 @@ export class MediaPipeTracker {
       poseLandmarkCount: pose?.landmarks.length ?? 0,
       error: null,
     };
+
+    const faceLandmarkCount = diagnostics.faceLandmarkCount;
+    const poseLandmarkCount = diagnostics.poseLandmarkCount;
+    if (
+      this.resultCount <= 3 ||
+      faceLandmarkCount !== this.lastReportedFaceLandmarkCount ||
+      poseLandmarkCount !== this.lastReportedPoseLandmarkCount
+    ) {
+      console.info(
+        `[MediaPipeTracker] face landmarks=${faceLandmarkCount}, pose landmarks=${poseLandmarkCount}, confidence=${Math.round(subject.confidence * 100)}%`,
+      );
+      this.lastReportedFaceLandmarkCount = faceLandmarkCount;
+      this.lastReportedPoseLandmarkCount = poseLandmarkCount;
+    }
 
     this.onResult?.({ subject, diagnostics, timestampMs: response.timestampMs });
     this.dispatchPending();

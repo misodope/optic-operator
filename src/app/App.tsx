@@ -398,6 +398,8 @@ export function App() {
           trackingStatus={tracking.status}
           trackingConfidence={tracking.confidence}
           trackingError={tracking.error}
+          faceLandmarkCount={tracking.faceLandmarkCount}
+          poseLandmarkCount={tracking.poseLandmarkCount}
         />
         <VerticalPreview
           preset={preset}
