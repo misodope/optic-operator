@@ -67,8 +67,12 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
       await ensureModuleFactory(request.assets.wasm);
       phase = 'resolving MediaPipe WASM files';
       const vision = await FilesetResolver.forVisionTasks(request.assets.wasm, true);
+      // We register the module factory ourselves below. Clearing the loader path
+      // prevents each task from re-importing the already-cached module and losing
+      // the factory between face and pose initialization.
+      const localVision = { ...vision, wasmLoaderPath: '' };
       phase = 'loading face model';
-      faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+      faceLandmarker = await FaceLandmarker.createFromOptions(localVision, {
         baseOptions: { modelAssetPath: request.assets.face },
         runningMode: 'VIDEO',
         numFaces: 2,
@@ -82,7 +86,7 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
       // MediaPipe consumes and clears the global factory after creating a task.
       // Re-register it before creating the second task in this worker.
       await ensureModuleFactory(request.assets.wasm);
-      poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+      poseLandmarker = await PoseLandmarker.createFromOptions(localVision, {
         baseOptions: { modelAssetPath: request.assets.pose },
         runningMode: 'VIDEO',
         numPoses: 2,
