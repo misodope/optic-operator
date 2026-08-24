@@ -81,6 +81,11 @@ const statusForSubject = (subject: SubjectState): RuntimeTrackingStatus => {
   return subject.confidence >= 0.45 ? 'tracking' : 'low-confidence';
 };
 
+// Keep the last usable face briefly when MediaPipe misses an individual frame.
+// This prevents the virtual camera and debug box from flickering during normal
+// motion, while still allowing the subject to be considered lost promptly.
+const FACE_HOLD_MS = 1000;
+
 const localAssetUrl = (assetPath: string): string => {
   if (typeof document === 'undefined') {
     return assetPath;
@@ -338,7 +343,9 @@ export class MediaPipeTracker {
     }
     const face =
       detectedFace ??
-      (response.timestampMs - this.lastFaceTimestampMs <= 500 ? this.lastFace : null);
+      (response.timestampMs - this.lastFaceTimestampMs <= FACE_HOLD_MS
+        ? this.lastFace
+        : null);
     const pose = normalizePoseLandmarks(response.poseLandmarks);
     const subject = combineTrackingResults({
       face,

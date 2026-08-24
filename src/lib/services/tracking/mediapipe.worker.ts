@@ -75,7 +75,9 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
       faceLandmarker = await FaceLandmarker.createFromOptions(localVision, {
         baseOptions: { modelAssetPath: request.assets.face },
         runningMode: 'VIDEO',
-        numFaces: 2,
+        // The MVP follows one primary creator. Limiting the task to one face
+        // reduces inference work and avoids switching between candidates.
+        numFaces: 1,
         minFaceDetectionConfidence: 0.3,
         minFacePresenceConfidence: 0.3,
         minTrackingConfidence: 0.3,
@@ -89,7 +91,7 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
       poseLandmarker = await PoseLandmarker.createFromOptions(localVision, {
         baseOptions: { modelAssetPath: request.assets.pose },
         runningMode: 'VIDEO',
-        numPoses: 2,
+        numPoses: 1,
         minPoseDetectionConfidence: 0.4,
         minPosePresenceConfidence: 0.4,
         minTrackingConfidence: 0.4,
