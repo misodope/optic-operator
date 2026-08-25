@@ -245,6 +245,15 @@ select:focus-visible {
   opacity: 1;
 }
 
+.source-hand-overlay {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .source-preview::before,
 .source-preview::after {
   position: absolute;
@@ -436,6 +445,14 @@ select:focus-visible {
   stroke-width: 1.5px;
 }
 
+.tracking-hand-circle {
+  vector-effect: non-scaling-stroke;
+  fill: rgba(247, 211, 123, 0.08);
+  stroke: #f7d37b;
+  stroke-width: 1.5px;
+  stroke-dasharray: 3 3;
+}
+
 .tracking-overlay-label {
   position: absolute;
   z-index: 3;
@@ -489,6 +506,12 @@ select:focus-visible {
   padding: 5px 7px;
   border: 1px solid rgba(184, 220, 164, 0.17);
   background: rgba(142, 200, 104, 0.06);
+}
+
+.vertical-preview-status .gesture-status-active {
+  color: #111512;
+  border-color: #a9df79;
+  background: #a9df79;
 }
 
 .vertical-preview-controls {

@@ -28,6 +28,7 @@ export interface CameraControllerInput {
   output: Dimensions;
   preset: FramingPresetConfig;
   nowMs: number;
+  gestureZoom?: number;
 }
 
 export interface CameraControllerState {

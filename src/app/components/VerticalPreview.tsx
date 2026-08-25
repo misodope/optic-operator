@@ -8,7 +8,12 @@ import {
 import type { CameraStatus, CameraStreamInfo } from '../../types/camera';
 import type { CameraControllerState } from '../../lib/camera-controller/types';
 import type { FramingPreset } from '../../types';
-import type { RuntimeTrackingStatus, SubjectState } from '../../types/tracking';
+import type {
+  GestureState,
+  LandmarkPoint,
+  RuntimeTrackingStatus,
+  SubjectState,
+} from '../../types/tracking';
 import { TrackingOverlay } from './TrackingOverlay';
 
 interface VerticalPreviewProps {
@@ -18,6 +23,8 @@ interface VerticalPreviewProps {
   videoRef: RefObject<HTMLVideoElement | null>;
   canvasRef?: RefObject<HTMLCanvasElement | null>;
   subject?: SubjectState | null;
+  handLandmarks?: LandmarkPoint[] | null;
+  gesture?: GestureState;
   trackingStatus?: RuntimeTrackingStatus;
   trackingError?: string | null;
 }
@@ -44,6 +51,14 @@ export function VerticalPreview({
   videoRef,
   canvasRef: outputCanvasRef,
   subject = null,
+  handLandmarks = null,
+  gesture = {
+    command: 'none',
+    zoomIntent: 0,
+    confidence: 0,
+    pinchDistance: null,
+    label: null,
+  },
   trackingStatus = 'disabled',
   trackingError = null,
 }: VerticalPreviewProps) {
@@ -51,6 +66,7 @@ export function VerticalPreview({
   const canvasRef = outputCanvasRef ?? internalCanvasRef;
   const controllerRef = useRef<CameraController | null>(null);
   const subjectRef = useRef<SubjectState | null>(subject);
+  const gestureRef = useRef<GestureState>(gesture);
   const [controllerState, setControllerState] = useState<CameraControllerState | null>(
     null,
   );
@@ -58,6 +74,10 @@ export function VerticalPreview({
   useEffect(() => {
     subjectRef.current = subject;
   }, [subject]);
+
+  useEffect(() => {
+    gestureRef.current = gesture;
+  }, [gesture]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -82,6 +102,7 @@ export function VerticalPreview({
           output: VERTICAL_OUTPUT,
           preset: preset.config,
           nowMs,
+          gestureZoom: gestureRef.current.zoomIntent,
         });
 
         renderVerticalCrop({
@@ -140,6 +161,7 @@ export function VerticalPreview({
           <div className="vertical-preview-lines" />
           <TrackingOverlay
             subject={subject}
+            handLandmarks={handLandmarks}
             controllerState={controllerState}
             trackingStatus={trackingStatus}
           />
@@ -156,6 +178,11 @@ export function VerticalPreview({
         <div className="vertical-preview-status">
           <span>{QUALITY_LABELS[controllerState.qualityState]}</span>
           <span>{TRACKING_LABELS[trackingStatus]}</span>
+          <span className={gesture.command !== 'none' ? 'gesture-status-active' : ''}>
+            {gesture.command === 'none'
+              ? 'Raise hand, then pinch or spread'
+              : gesture.label}
+          </span>
           <span>{controllerState.qualityScale.toFixed(2)}× source scale</span>
         </div>
       )}

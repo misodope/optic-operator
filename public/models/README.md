@@ -12,6 +12,9 @@ runtime CDN.
 - Pose Landmarker Lite: MediaPipe model version `1`
   - Source: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`
   - SHA-256: `59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a`
+- Gesture Recognizer: MediaPipe model version `1`
+  - Source: `https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task`
+  - SHA-256: `97952348cf6a6a4915c2ea1496b4b37ebabc50cbbf80571435643c455f2b0482`
 
 The `wasm/` files are copied from the installed `@mediapipe/tasks-vision` package at
 version `0.10.22` so the task runtime is available offline in the packaged app.

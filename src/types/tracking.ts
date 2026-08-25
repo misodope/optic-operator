@@ -51,6 +51,17 @@ export interface SubjectState {
 export type RuntimeTrackingStatus =
   'disabled' | 'initializing' | 'tracking' | 'low-confidence' | 'lost' | 'error';
 
+export type GestureCommand = 'none' | 'zoom-in' | 'zoom-out';
+
+export interface GestureState {
+  command: GestureCommand;
+  /** Normalized intent: -1 zooms out, 1 zooms in, 0 releases manual zoom. */
+  zoomIntent: number;
+  confidence: number;
+  pinchDistance: number | null;
+  label: string | null;
+}
+
 export interface TrackingDiagnostics {
   status: RuntimeTrackingStatus;
   confidence: number;
@@ -60,6 +71,8 @@ export interface TrackingDiagnostics {
   staleResultsDropped: number;
   faceLandmarkCount: number;
   poseLandmarkCount: number;
+  handLandmarks: LandmarkPoint[] | null;
+  gesture: GestureState;
   error: string | null;
 }
 

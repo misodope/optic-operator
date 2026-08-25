@@ -57,6 +57,7 @@ describe('MediaPipe tracker lifecycle', () => {
         wasm: 'models/wasm',
         face: 'models/face.task',
         pose: 'models/pose.task',
+        gesture: 'models/gesture.task',
       },
     });
     const initialized = tracker.initialize();
@@ -101,6 +102,8 @@ describe('MediaPipe tracker lifecycle', () => {
       timestampMs: 100,
       faceLandmarks: [],
       poseLandmarks: [],
+      handLandmarks: [],
+      handConfidence: 0,
     });
 
     expect(worker.messages).toHaveLength(3);
@@ -115,6 +118,8 @@ describe('MediaPipe tracker lifecycle', () => {
       timestampMs: 120,
       faceLandmarks: [],
       poseLandmarks: [],
+      handLandmarks: [],
+      handConfidence: 0,
     });
 
     expect(results).toHaveBeenCalledWith(
@@ -133,6 +138,7 @@ describe('MediaPipe tracker lifecycle', () => {
             wasm: 'https://example.com/wasm',
             face: 'models/face.task',
             pose: 'models/pose.task',
+            gesture: 'models/gesture.task',
           },
         }),
     ).toThrow('bundled local application files');

@@ -1,6 +1,7 @@
 import {
   FaceLandmarker,
   FilesetResolver,
+  GestureRecognizer,
   PoseLandmarker,
   type NormalizedLandmark,
 } from '@mediapipe/tasks-vision';
@@ -14,6 +15,7 @@ import type { LandmarkPoint } from '../../../types/tracking';
 
 let faceLandmarker: FaceLandmarker | null = null;
 let poseLandmarker: PoseLandmarker | null = null;
+let gestureRecognizer: GestureRecognizer | null = null;
 
 const copyLandmarks = (landmarks: NormalizedLandmark[][]): LandmarkPoint[][] =>
   landmarks.map((candidate) =>
@@ -28,8 +30,10 @@ const copyLandmarks = (landmarks: NormalizedLandmark[][]): LandmarkPoint[][] =>
 const closeLandmarkers = (): void => {
   faceLandmarker?.close();
   poseLandmarker?.close();
+  gestureRecognizer?.close();
   faceLandmarker = null;
   poseLandmarker = null;
+  gestureRecognizer = null;
 };
 
 const ensureModuleFactory = async (wasmPath: string): Promise<void> => {
@@ -97,6 +101,19 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
         minTrackingConfidence: 0.4,
         outputSegmentationMasks: false,
       });
+      phase = 'loading gesture model';
+      await ensureModuleFactory(request.assets.wasm);
+      gestureRecognizer = await GestureRecognizer.createFromOptions(localVision, {
+        baseOptions: { modelAssetPath: request.assets.gesture },
+        runningMode: 'VIDEO',
+        numHands: 1,
+        // Keep detection sensitive enough to find a creator's hand farther
+        // from the camera. The renderer applies its own geometry and timing
+        // gates before allowing a zoom command.
+        minHandDetectionConfidence: 0.3,
+        minHandPresenceConfidence: 0.3,
+        minTrackingConfidence: 0.3,
+      });
       phase = 'running inference';
       self.postMessage({ type: 'ready' } satisfies MediaPipeWorkerResponse);
       return;
@@ -108,7 +125,7 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
       return;
     }
 
-    if (!faceLandmarker || !poseLandmarker) {
+    if (!faceLandmarker || !poseLandmarker || !gestureRecognizer) {
       throw new Error('MediaPipe tracker is not initialized.');
     }
 
@@ -120,12 +137,20 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
       request.frame,
       request.timestampMs,
     );
+    const gestureResult = gestureRecognizer.recognizeForVideo(
+      request.frame,
+      request.timestampMs,
+    );
     const result: SerializedDetectionResult = {
       type: 'result',
       requestId: request.requestId,
       timestampMs: request.timestampMs,
       faceLandmarks: copyLandmarks(faceResult.faceLandmarks),
       poseLandmarks: copyLandmarks(poseResult.landmarks),
+      handLandmarks: copyLandmarks(gestureResult.landmarks),
+      // A detected hand can have no useful handedness score. The renderer
+      // applies the geometric size gate and temporal debounce separately.
+      handConfidence: gestureResult.handedness[0]?.[0]?.score ?? 1,
     };
     request.frame.close();
     self.postMessage(result satisfies MediaPipeWorkerResponse);

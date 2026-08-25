@@ -13,6 +13,14 @@ export const initialSessionState: SessionStoreState = {
     staleResultsDropped: 0,
     faceLandmarkCount: 0,
     poseLandmarkCount: 0,
+    handLandmarks: null,
+    gesture: {
+      command: 'none',
+      zoomIntent: 0,
+      confidence: 0,
+      pinchDistance: null,
+      label: null,
+    },
     error: null,
   },
 };

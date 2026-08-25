@@ -1,11 +1,11 @@
-export const HAND_TRACKING_ENABLED = false;
+export const HAND_TRACKING_ENABLED = true;
 
 export interface HandTrackingStatus {
-  enabled: false;
-  message: 'Hand tracking is reserved for a later phase.';
+  enabled: true;
+  message: 'Hand landmarks power pinch-to-zoom.';
 }
 
 export const getHandTrackingStatus = (): HandTrackingStatus => ({
-  enabled: false,
-  message: 'Hand tracking is reserved for a later phase.',
+  enabled: true,
+  message: 'Hand landmarks power pinch-to-zoom.',
 });

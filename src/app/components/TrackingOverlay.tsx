@@ -7,6 +7,7 @@ import type {
 
 interface TrackingOverlayProps {
   subject: SubjectState | null;
+  handLandmarks: LandmarkPoint[] | null;
   controllerState: CameraControllerState | null;
   trackingStatus: RuntimeTrackingStatus;
 }
@@ -78,14 +79,15 @@ const clampRect = (rect: OverlayRect): OverlayRect => ({
 
 export function TrackingOverlay({
   subject,
+  handLandmarks,
   controllerState,
   trackingStatus,
 }: TrackingOverlayProps) {
-  if (!subject?.detected || !controllerState) {
+  if (!controllerState) {
     return null;
   }
 
-  const faceBounds = subject.face
+  const faceBounds = subject?.face
     ? projectRect(
         {
           x: subject.face.centerX - subject.face.width / 2,
@@ -96,7 +98,7 @@ export function TrackingOverlay({
         controllerState.crop,
       )
     : null;
-  const shoulderBounds = subject.pose
+  const shoulderBounds = subject?.pose
     ? projectRect(
         boundsFor(subject.pose.landmarks, [11, 12, 23, 24]) ?? {
           x:
@@ -109,10 +111,28 @@ export function TrackingOverlay({
         controllerState.crop,
       )
     : null;
-  const eye = subject.face
+  const eye = subject?.face
     ? projectPoint(subject.face.eyeX, subject.face.eyeY, controllerState.crop)
     : null;
-  const label = trackingStatus === 'low-confidence' ? 'LOW CONFIDENCE' : 'TRACKING';
+  const rawHandBounds = handLandmarks?.length ? boundsFor(handLandmarks) : null;
+  const handBounds = rawHandBounds
+    ? projectRect(rawHandBounds, controllerState.crop)
+    : null;
+  const handCircle = handBounds
+    ? {
+        cx: handBounds.x + handBounds.width / 2,
+        cy: handBounds.y + handBounds.height / 2,
+        rx: Math.max(0.025, handBounds.width * 0.7),
+        ry: Math.max(0.025, handBounds.height * 0.7),
+      }
+    : null;
+  const label = subject?.detected
+    ? trackingStatus === 'low-confidence'
+      ? 'LOW CONFIDENCE'
+      : 'TRACKING'
+    : handCircle
+      ? 'HAND DETECTED'
+      : null;
 
   return (
     <>
@@ -139,12 +159,15 @@ export function TrackingOverlay({
             r="0.012"
           />
         )}
+        {handCircle && <ellipse className="tracking-hand-circle" {...handCircle} />}
       </svg>
-      <div className="tracking-overlay-label">
-        <span className="tracking-overlay-dot" />
-        <span>{label}</span>
-        <span>{Math.round(subject.confidence * 100)}%</span>
-      </div>
+      {label && (
+        <div className="tracking-overlay-label">
+          <span className="tracking-overlay-dot" />
+          <span>{label}</span>
+          {subject?.detected && <span>{Math.round(subject.confidence * 100)}%</span>}
+        </div>
+      )}
     </>
   );
 }

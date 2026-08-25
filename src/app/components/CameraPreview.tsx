@@ -2,7 +2,7 @@ import type { RefObject } from 'react';
 
 import type { CameraError, CameraStatus, CameraStreamInfo } from '../../types/camera';
 import { formatAspectRatio, isLowResolution } from '../../lib/utils/aspectRatio';
-import type { RuntimeTrackingStatus } from '../../types/tracking';
+import type { LandmarkPoint, RuntimeTrackingStatus } from '../../types/tracking';
 
 interface CameraPreviewProps {
   deviceLabel: string | null;
@@ -16,6 +16,7 @@ interface CameraPreviewProps {
   trackingError?: string | null;
   faceLandmarkCount?: number;
   poseLandmarkCount?: number;
+  handLandmarks?: LandmarkPoint[] | null;
 }
 
 const formatFrameRate = (frameRate: number | null): string =>
@@ -33,11 +34,34 @@ export function CameraPreview({
   trackingError = null,
   faceLandmarkCount = 0,
   poseLandmarkCount = 0,
+  handLandmarks = null,
 }: CameraPreviewProps) {
   const hasSource = status === 'ready' && streamInfo !== null;
   const lowResolution = streamInfo
     ? isLowResolution(streamInfo.width, streamInfo.height)
     : false;
+  const handBounds = handLandmarks?.length
+    ? {
+        minX: Math.min(...handLandmarks.map((landmark) => landmark.x)),
+        maxX: Math.max(...handLandmarks.map((landmark) => landmark.x)),
+        minY: Math.min(...handLandmarks.map((landmark) => landmark.y)),
+        maxY: Math.max(...handLandmarks.map((landmark) => landmark.y)),
+      }
+    : null;
+  const sourceHandCircle = handBounds
+    ? {
+        cx: ((handBounds.minX + handBounds.maxX) / 2) * (streamInfo?.width ?? 1),
+        cy: ((handBounds.minY + handBounds.maxY) / 2) * (streamInfo?.height ?? 1),
+        rx: Math.max(
+          24,
+          (handBounds.maxX - handBounds.minX) * (streamInfo?.width ?? 1) * 0.7,
+        ),
+        ry: Math.max(
+          24,
+          (handBounds.maxY - handBounds.minY) * (streamInfo?.height ?? 1) * 0.7,
+        ),
+      }
+    : null;
 
   return (
     <section className="preview-card preview-card-source" aria-label="Camera preview">
@@ -59,6 +83,22 @@ export function CameraPreview({
           playsInline
           aria-label="Raw camera source"
         />
+        {hasSource && streamInfo && sourceHandCircle && (
+          <svg
+            className="source-hand-overlay"
+            viewBox={`0 0 ${streamInfo.width} ${streamInfo.height}`}
+            preserveAspectRatio="xMidYMid meet"
+            aria-label="Detected hand"
+          >
+            <ellipse
+              className="tracking-hand-circle"
+              cx={sourceHandCircle.cx}
+              cy={sourceHandCircle.cy}
+              rx={sourceHandCircle.rx}
+              ry={sourceHandCircle.ry}
+            />
+          </svg>
+        )}
         {!hasSource && (
           <div className="source-placeholder">
             <div className="camera-glyph" aria-hidden="true">
@@ -76,7 +116,7 @@ export function CameraPreview({
                 ? 'Waiting for the selected source to report its video mode.'
                 : status === 'permission-required'
                   ? 'Allow camera access in macOS System Settings, then reconnect the source.'
-                  : 'Connect the LUMIX S9 directly or choose OBS Virtual Camera to begin.'}
+                  : 'Connect a camera directly or choose OBS Virtual Camera to begin.'}
             </span>
             {(status === 'error' || status === 'disconnected') && (
               <button className="secondary-button" type="button" onClick={onReconnect}>

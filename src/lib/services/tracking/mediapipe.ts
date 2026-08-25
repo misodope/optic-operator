@@ -3,8 +3,15 @@ import {
   normalizeFaceLandmarks,
   normalizePoseLandmarks,
 } from './faceTracker';
+import {
+  classifyPinchZoom,
+  createNeutralGestureState,
+  isHandInGestureZone,
+  isUsableHand,
+} from './gestureRecognizer';
 import type {
   FaceTrackingSummary,
+  GestureState,
   LandmarkPoint,
   PoseTrackingSummary,
   RuntimeTrackingStatus,
@@ -17,12 +24,14 @@ export interface ModelAssetPaths {
   wasm: string;
   face: string;
   pose: string;
+  gesture: string;
 }
 
 export const DEFAULT_MODEL_ASSETS: ModelAssetPaths = {
   wasm: 'models/wasm',
   face: 'models/face_landmarker.task',
   pose: 'models/pose_landmarker_lite.task',
+  gesture: 'models/gesture_recognizer.task',
 };
 
 export interface SerializedDetectionResult {
@@ -31,6 +40,8 @@ export interface SerializedDetectionResult {
   timestampMs: number;
   faceLandmarks: LandmarkPoint[][];
   poseLandmarks: LandmarkPoint[][];
+  handLandmarks: LandmarkPoint[][];
+  handConfidence: number;
 }
 
 export type MediaPipeWorkerRequest =
@@ -141,7 +152,7 @@ const localAssetUrl = (assetPath: string): string => {
 export const resolveLocalModelAssets = (
   assets: ModelAssetPaths = DEFAULT_MODEL_ASSETS,
 ): ModelAssetPaths => {
-  const paths = [assets.wasm, assets.face, assets.pose];
+  const paths = [assets.wasm, assets.face, assets.pose, assets.gesture];
   if (paths.some((path) => /^https?:\/\//i.test(path))) {
     throw new Error('MediaPipe assets must be bundled local application files.');
   }
@@ -150,6 +161,7 @@ export const resolveLocalModelAssets = (
     wasm: localAssetUrl(assets.wasm),
     face: localAssetUrl(assets.face),
     pose: localAssetUrl(assets.pose),
+    gesture: localAssetUrl(assets.gesture),
   };
 };
 
@@ -206,6 +218,18 @@ export class MediaPipeTracker {
   private lastFacePose: PoseTrackingSummary | null = null;
 
   private lastFaceTimestampMs = -Infinity;
+
+  private lastGesture: GestureState = createNeutralGestureState();
+
+  private lastGestureTimestampMs = -Infinity;
+
+  private gestureCandidate: GestureState = createNeutralGestureState();
+
+  private gestureCandidateTimestampMs = -Infinity;
+
+  private gestureHandSinceMs = -Infinity;
+
+  private gestureArmed = false;
 
   private readonly handleMessageBound = (
     event: MessageEvent<MediaPipeWorkerResponse>,
@@ -400,6 +424,31 @@ export class MediaPipeTracker {
       pose,
       timestampMs: response.timestampMs,
     });
+    const rawHandLandmarks = response.handLandmarks[0] ?? [];
+    const usableHand = isUsableHand(rawHandLandmarks, response.handConfidence);
+    const handInGestureZone = usableHand && isHandInGestureZone(rawHandLandmarks);
+    let detectedGesture = handInGestureZone
+      ? classifyPinchZoom(
+          rawHandLandmarks,
+          response.handConfidence,
+          this.lastGesture.command,
+        )
+      : createNeutralGestureState();
+    if (handInGestureZone) {
+      if (this.gestureHandSinceMs === -Infinity) {
+        this.gestureHandSinceMs = response.timestampMs;
+      }
+      if (response.timestampMs - this.gestureHandSinceMs >= 150) {
+        this.gestureArmed = true;
+      }
+    } else {
+      this.gestureHandSinceMs = -Infinity;
+      this.gestureArmed = false;
+    }
+    if (!this.gestureArmed) {
+      detectedGesture = createNeutralGestureState();
+    }
+    const gesture = this.resolveGesture(detectedGesture, response.timestampMs);
     const diagnostics: TrackingDiagnostics = {
       status: statusForSubject(subject),
       confidence: subject.confidence,
@@ -416,6 +465,8 @@ export class MediaPipeTracker {
       staleResultsDropped: this.staleResultsDropped,
       faceLandmarkCount: face?.landmarks.length ?? 0,
       poseLandmarkCount: pose?.landmarks.length ?? 0,
+      handLandmarks: usableHand ? rawHandLandmarks : null,
+      gesture,
       error: null,
     };
 
@@ -427,7 +478,7 @@ export class MediaPipeTracker {
       poseLandmarkCount !== this.lastReportedPoseLandmarkCount
     ) {
       console.info(
-        `[MediaPipeTracker] face landmarks=${faceLandmarkCount}, pose landmarks=${poseLandmarkCount}, confidence=${Math.round(subject.confidence * 100)}%`,
+        `[MediaPipeTracker] face landmarks=${faceLandmarkCount}, pose landmarks=${poseLandmarkCount}, gesture=${gesture.command}, confidence=${Math.round(subject.confidence * 100)}%`,
       );
       this.lastReportedFaceLandmarkCount = faceLandmarkCount;
       this.lastReportedPoseLandmarkCount = poseLandmarkCount;
@@ -435,6 +486,50 @@ export class MediaPipeTracker {
 
     this.onResult?.({ subject, diagnostics, timestampMs: response.timestampMs });
     this.dispatchPending();
+  }
+
+  private resolveGesture(next: GestureState, timestampMs: number): GestureState {
+    const gestureActivationMs = 400;
+    const gestureReleaseHoldMs = 100;
+
+    if (next.command === 'none') {
+      this.gestureCandidate = createNeutralGestureState();
+      if (
+        this.lastGesture.command !== 'none' &&
+        timestampMs - this.lastGestureTimestampMs <= gestureReleaseHoldMs
+      ) {
+        return this.lastGesture;
+      }
+      this.lastGesture = createNeutralGestureState();
+      return this.lastGesture;
+    }
+
+    if (this.lastGesture.command === next.command) {
+      this.lastGesture = next;
+      this.lastGestureTimestampMs = timestampMs;
+      return next;
+    }
+
+    if (this.gestureCandidate.command !== next.command) {
+      this.gestureCandidate = next;
+      this.gestureCandidateTimestampMs = timestampMs;
+    }
+
+    if (timestampMs - this.gestureCandidateTimestampMs >= gestureActivationMs) {
+      this.lastGesture = next;
+      this.lastGestureTimestampMs = timestampMs;
+      this.gestureCandidate = createNeutralGestureState();
+      return next;
+    }
+
+    if (
+      this.lastGesture.command !== 'none' &&
+      timestampMs - this.lastGestureTimestampMs <= gestureReleaseHoldMs
+    ) {
+      return this.lastGesture;
+    }
+
+    return createNeutralGestureState();
   }
 
   private reportError(error: unknown): void {

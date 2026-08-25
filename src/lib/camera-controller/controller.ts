@@ -61,9 +61,15 @@ export class CameraController {
 
   private lastDetectedAtMs: number | null = null;
 
+  private automaticTargetZoom = 1;
+
+  private gestureZoomOffset = 0;
+
   reset(): void {
     this.state = null;
     this.lastDetectedAtMs = null;
+    this.automaticTargetZoom = 1;
+    this.gestureZoomOffset = 0;
   }
 
   getState(): CameraControllerState | null {
@@ -89,7 +95,6 @@ export class CameraController {
       x: previous.targetCropCenterX,
       y: previous.targetCropCenterY,
     };
-    let targetZoom = previous.targetZoom;
     let trackingStatus: CameraControllerState['trackingStatus'] = 'disabled';
     let lastSubjectTimestampMs = previous.lastSubjectTimestampMs;
 
@@ -115,7 +120,7 @@ export class CameraController {
         preset.deadZoneX,
         preset.deadZoneY,
       );
-      targetZoom = nextZoom;
+      this.automaticTargetZoom = nextZoom;
       trackingStatus = 'tracking';
       this.lastDetectedAtMs = nowMs;
       lastSubjectTimestampMs = subject.timestampMs;
@@ -125,12 +130,36 @@ export class CameraController {
       const timeSinceDetection = nowMs - this.lastDetectedAtMs;
       trackingStatus = 'lost';
       if (timeSinceDetection > preset.lostSubjectHoldMs) {
-        targetZoom = 1;
+        this.automaticTargetZoom = 1;
       }
       if (timeSinceDetection > preset.lostSubjectWidenAfterMs) {
         targetCropCenter = { x: previous.cropCenterX, y: previous.cropCenterY };
       }
     }
+
+    const gestureZoomIntent = clamp(input.gestureZoom ?? 0, -1, 1);
+    const gestureDeltaMs = Math.min(deltaMs, 100);
+    if (Math.abs(gestureZoomIntent) > 0.01) {
+      this.gestureZoomOffset = clamp(
+        this.gestureZoomOffset + gestureZoomIntent * 0.75 * (gestureDeltaMs / 1000),
+        -0.5,
+        0.5,
+      );
+    } else {
+      this.gestureZoomOffset = smoothTowards(
+        this.gestureZoomOffset,
+        0,
+        gestureDeltaMs,
+        450,
+        1.25,
+      );
+    }
+
+    const targetZoom = clamp(
+      this.automaticTargetZoom + this.gestureZoomOffset,
+      1,
+      targetZoomLimit,
+    );
 
     const nextCenter = smoothPoint(
       { x: previous.cropCenterX, y: previous.cropCenterY },

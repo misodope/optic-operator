@@ -139,7 +139,7 @@ export function RecordingControls({
       ) : (
         <p className="field-help">
           Captures the processed 1080 × 1920 vertical frame with the selected audio
-          input. The first capture format is WebM.
+          input and saves a high-quality H.264 MP4.
         </p>
       )}
     </section>

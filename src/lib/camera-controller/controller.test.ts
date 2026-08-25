@@ -228,4 +228,31 @@ describe('camera controller', () => {
     expect(state.qualityState).toBe('below-target');
     expect(state.crop.width).toBe(0);
   });
+
+  it('applies pinch zoom intent smoothly within the source quality limit', () => {
+    const controller = new CameraController();
+    controller.update({ subject: subject(0), source, output, preset, nowMs: 0 });
+
+    const zoomedIn = controller.update({
+      subject: subject(1000, { shoulderWidth: 0.18 }),
+      source,
+      output,
+      preset,
+      nowMs: 1000,
+      gestureZoom: 1,
+    });
+    const released = controller.update({
+      subject: subject(2000, { shoulderWidth: 0.18 }),
+      source,
+      output,
+      preset,
+      nowMs: 2000,
+      gestureZoom: 0,
+    });
+
+    expect(zoomedIn.targetZoom).toBeGreaterThan(1);
+    expect(zoomedIn.targetZoom).toBeLessThanOrEqual(1.125);
+    expect(released.targetZoom).toBeLessThan(zoomedIn.targetZoom);
+    expect(released.zoom).toBeGreaterThanOrEqual(1);
+  });
 });

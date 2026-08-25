@@ -405,6 +405,14 @@ export function App() {
         staleResultsDropped: 0,
         faceLandmarkCount: 0,
         poseLandmarkCount: 0,
+        handLandmarks: null,
+        gesture: {
+          command: 'none',
+          zoomIntent: 0,
+          confidence: 0,
+          pinchDistance: null,
+          label: null,
+        },
         error: null,
       });
       return undefined;
@@ -429,6 +437,14 @@ export function App() {
       staleResultsDropped: 0,
       faceLandmarkCount: 0,
       poseLandmarkCount: 0,
+      handLandmarks: null,
+      gesture: {
+        command: 'none',
+        zoomIntent: 0,
+        confidence: 0,
+        pinchDistance: null,
+        label: null,
+      },
       error: null,
     });
 
@@ -522,16 +538,16 @@ export function App() {
     >
       <section className="hero-row">
         <div>
-          <p className="eyebrow">PHASE 5 / RECORDING CAPTURE</p>
+          <p className="eyebrow">AI VERTICAL CAMERA</p>
           <h2 className="hero-title">A quieter, smarter way to stay in frame.</h2>
           <p className="hero-copy">
-            Connect the S9 directly or route it through OBS Virtual Camera and see the
-            actual source mode negotiated by macOS before recording.
+            Connect any camera input directly or route it through OBS Virtual Camera and
+            see the actual source mode negotiated by macOS before recording.
           </p>
         </div>
         <div className="hero-note">
           <span className="hero-note-label">SOURCE TARGET</span>
-          <strong>S9 / OBS Virtual Camera → Mac</strong>
+          <strong>Camera input → Mac</strong>
           <span>Current working input: 1920 × 1080 / 30 fps</span>
         </div>
       </section>
@@ -549,6 +565,7 @@ export function App() {
           trackingError={tracking.error}
           faceLandmarkCount={tracking.faceLandmarkCount}
           poseLandmarkCount={tracking.poseLandmarkCount}
+          handLandmarks={tracking.handLandmarks}
         />
         <VerticalPreview
           preset={preset}
@@ -557,6 +574,8 @@ export function App() {
           videoRef={videoRef}
           canvasRef={outputCanvasRef}
           subject={tracking.subject}
+          handLandmarks={tracking.handLandmarks}
+          gesture={tracking.gesture}
           trackingStatus={tracking.status}
           trackingError={tracking.error}
         />
@@ -582,8 +601,8 @@ export function App() {
 
       <footer className="footer-note">
         <span className="footer-mark">OO</span>
-        <span>Local-first creator tooling · Built for the LUMIX S9</span>
-        <span>Phase 5 recording capture</span>
+        <span>Local-first creator tooling · Built for any camera input</span>
+        <span>Vertical capture</span>
       </footer>
     </AppShell>
   );

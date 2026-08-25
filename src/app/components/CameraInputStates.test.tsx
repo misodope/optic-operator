@@ -59,7 +59,7 @@ describe('camera input UI states', () => {
       <CameraPreview
         {...props}
         status="ready"
-        deviceLabel="S9 Capture Card"
+        deviceLabel="Test Capture Camera"
         streamInfo={streamInfo}
       />,
     );

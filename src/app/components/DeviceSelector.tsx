@@ -78,8 +78,8 @@ export function DeviceSelector({
         ))}
       </select>
       <p className="field-help">
-        Start setup to grant access. The S9 micro-HDMI capture-card feed is the
-        production target; USB webcam mode remains a fallback.
+        Start setup to grant access. Direct camera feeds and OBS Virtual Camera are
+        supported, and the app uses the negotiated source mode.
       </p>
       <div className="device-actions">
         <button

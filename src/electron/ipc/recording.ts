@@ -4,6 +4,7 @@ import { appendFile, mkdir, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { RecordingState } from '../../types/recording';
+import { convertCaptureToMp4 } from '../services/ffmpeg';
 
 export const RECORDING_IPC_CHANNELS = {
   getState: 'recording:get-state',
@@ -15,6 +16,7 @@ export const RECORDING_IPC_CHANNELS = {
 
 interface ActiveCapture {
   temporaryPath: string;
+  sourcePath: string;
   outputPath: string;
   writeQueue: Promise<void>;
 }
@@ -31,9 +33,6 @@ const defaultRecordingState: RecordingState = {
 const isMimeType = (value: unknown): value is string =>
   typeof value === 'string' && value.startsWith('video/');
 
-const extensionForMimeType = (mimeType: string): string =>
-  mimeType.includes('mp4') ? 'mp4' : 'webm';
-
 const isCaptureId = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0 && value.length <= 80;
 
@@ -43,13 +42,13 @@ const isByteArray = (value: unknown): value is Uint8Array =>
 const recordingsDirectory = (): string =>
   path.join(app.getPath('videos'), 'Optic Operator');
 
-const uniqueOutputPath = async (extension: string): Promise<string> => {
+const uniqueOutputPath = async (): Promise<string> => {
   const directory = recordingsDirectory();
   await mkdir(directory, { recursive: true });
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   return path.join(
     directory,
-    `optic-operator-${timestamp}-${randomUUID().slice(0, 8)}.${extension}`,
+    `optic-operator-${timestamp}-${randomUUID().slice(0, 8)}.mp4`,
   );
 };
 
@@ -71,13 +70,15 @@ export const registerRecordingIpcHandlers = (): void => {
         throw new Error('The recording format is invalid.');
       }
 
-      const extension = extensionForMimeType(mimeType);
-      const outputPath = await uniqueOutputPath(extension);
+      const outputPath = await uniqueOutputPath();
       const captureId = randomUUID();
-      const temporaryPath = `${outputPath}.part`;
+      const sourceExtension = mimeType.includes('mp4') ? 'mp4' : 'webm';
+      const sourcePath = outputPath.replace(/\.mp4$/i, `.source.${sourceExtension}`);
+      const temporaryPath = `${sourcePath}.part`;
       await writeFile(temporaryPath, Buffer.alloc(0));
       activeCaptures.set(captureId, {
         temporaryPath,
+        sourcePath,
         outputPath,
         writeQueue: Promise.resolve(),
       });
@@ -110,9 +111,21 @@ export const registerRecordingIpcHandlers = (): void => {
 
       const capture = captureFor(captureId);
       await capture.writeQueue;
-      await rename(capture.temporaryPath, capture.outputPath);
-      activeCaptures.delete(captureId);
-      return capture.outputPath;
+      await rename(capture.temporaryPath, capture.sourcePath);
+
+      try {
+        await convertCaptureToMp4(capture.sourcePath, capture.outputPath);
+        await unlink(capture.sourcePath);
+        return capture.outputPath;
+      } catch (error: unknown) {
+        await unlink(capture.outputPath).catch(() => undefined);
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `${message} The original capture was kept at ${capture.sourcePath}.`,
+        );
+      } finally {
+        activeCaptures.delete(captureId);
+      }
     },
   );
 
@@ -128,6 +141,7 @@ export const registerRecordingIpcHandlers = (): void => {
         await capture.writeQueue;
       } finally {
         await unlink(capture.temporaryPath).catch(() => undefined);
+        await unlink(capture.sourcePath).catch(() => undefined);
         activeCaptures.delete(captureId);
       }
     },
