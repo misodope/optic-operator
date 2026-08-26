@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 
 import { CameraController } from '../../lib/camera-controller';
-import {
-  renderVerticalCrop,
-  VERTICAL_OUTPUT,
-} from '../../lib/services/rendering/verticalCropRenderer';
-import type { CameraStatus, CameraStreamInfo } from '../../types/camera';
 import type { CameraControllerState } from '../../lib/camera-controller/types';
+import {
+  HORIZONTAL_OUTPUT,
+  renderHorizontalCrop,
+} from '../../lib/services/rendering/horizontalCropRenderer';
+import type { CameraStatus, CameraStreamInfo } from '../../types/camera';
 import type { FramingPreset } from '../../types';
 import type {
   GestureState,
@@ -16,12 +16,12 @@ import type {
 } from '../../types/tracking';
 import { TrackingOverlay } from './TrackingOverlay';
 
-interface VerticalPreviewProps {
+interface HorizontalPreviewProps {
   preset: FramingPreset;
   sourceStatus: CameraStatus;
   streamInfo: CameraStreamInfo | null;
   videoRef: RefObject<HTMLVideoElement | null>;
-  canvasRef?: RefObject<HTMLCanvasElement | null>;
+  canvasRef: RefObject<HTMLCanvasElement | null>;
   subject?: SubjectState | null;
   handLandmarks?: LandmarkPoint[] | null;
   gesture?: GestureState;
@@ -33,7 +33,7 @@ interface VerticalPreviewProps {
 const QUALITY_LABELS: Record<CameraControllerState['qualityState'], string> = {
   good: 'Good source quality',
   caution: 'Quality caution',
-  'below-target': 'Below 1080 × 1920 target',
+  'below-target': 'Below 1920 × 1080 target',
 };
 
 const TRACKING_LABELS: Record<RuntimeTrackingStatus, string> = {
@@ -45,15 +45,14 @@ const TRACKING_LABELS: Record<RuntimeTrackingStatus, string> = {
   error: 'Tracking unavailable',
 };
 
-export function VerticalPreview({
+export function HorizontalPreview({
   preset,
   sourceStatus,
   streamInfo,
   videoRef,
-  canvasRef: outputCanvasRef,
+  canvasRef,
   subject = null,
   handLandmarks = null,
-  framingScale = 1,
   gesture = {
     command: 'none',
     zoomIntent: 0,
@@ -61,11 +60,10 @@ export function VerticalPreview({
     pinchDistance: null,
     label: null,
   },
+  framingScale = 1,
   trackingStatus = 'disabled',
   trackingError = null,
-}: VerticalPreviewProps) {
-  const internalCanvasRef = useRef<HTMLCanvasElement>(null);
-  const canvasRef = outputCanvasRef ?? internalCanvasRef;
+}: HorizontalPreviewProps) {
   const controllerRef = useRef<CameraController | null>(null);
   const subjectRef = useRef<SubjectState | null>(subject);
   const gestureRef = useRef<GestureState>(gesture);
@@ -106,19 +104,19 @@ export function VerticalPreview({
         const nextState = controller.update({
           subject: subjectRef.current,
           source: { width: streamInfo.width, height: streamInfo.height },
-          output: VERTICAL_OUTPUT,
+          output: HORIZONTAL_OUTPUT,
           preset: preset.config,
           nowMs,
           gestureZoom: gestureRef.current.zoomIntent,
           framingScale: framingScaleRef.current,
         });
 
-        renderVerticalCrop({
+        renderHorizontalCrop({
           canvas,
           source: video,
           sourceDimensions: { width: streamInfo.width, height: streamInfo.height },
           controllerState: nextState,
-          output: VERTICAL_OUTPUT,
+          output: HORIZONTAL_OUTPUT,
         });
 
         if (nowMs - lastPublishedAt >= 100) {
@@ -136,7 +134,7 @@ export function VerticalPreview({
       cancelAnimationFrame(animationFrame);
       controllerRef.current = null;
     };
-  }, [preset, sourceStatus, streamInfo, videoRef]);
+  }, [canvasRef, preset, sourceStatus, streamInfo, videoRef]);
 
   const recenter = useCallback((): void => {
     controllerRef.current?.reset();
@@ -147,26 +145,26 @@ export function VerticalPreview({
 
   return (
     <section
-      className="preview-card preview-card-vertical"
-      aria-label="Vertical preview"
+      className="preview-card preview-card-horizontal"
+      aria-label="Horizontal output preview"
     >
       <div className="preview-card-header">
         <div>
           <p className="eyebrow">OUTPUT</p>
-          <h2>Vertical frame</h2>
+          <h2>Horizontal frame</h2>
         </div>
-        <span className="format-badge">9:16</span>
+        <span className="format-badge">16:9</span>
       </div>
-      <div className="vertical-preview-wrap">
-        <div className="vertical-preview">
+      <div className="horizontal-preview-wrap">
+        <div className="horizontal-preview">
           <canvas
             ref={canvasRef}
-            className={`vertical-preview-canvas ${hasSource ? 'vertical-preview-canvas-visible' : ''}`}
-            width={VERTICAL_OUTPUT.width}
-            height={VERTICAL_OUTPUT.height}
-            aria-label="Live 9:16 camera composition"
+            className={`horizontal-preview-canvas ${hasSource ? 'horizontal-preview-canvas-visible' : ''}`}
+            width={HORIZONTAL_OUTPUT.width}
+            height={HORIZONTAL_OUTPUT.height}
+            aria-label="Live 16:9 camera composition"
           />
-          <div className="vertical-preview-lines" />
+          <div className="horizontal-preview-lines" />
           <TrackingOverlay
             subject={subject}
             handLandmarks={handLandmarks}
@@ -174,22 +172,20 @@ export function VerticalPreview({
             trackingStatus={trackingStatus}
           />
           {!hasSource && (
-            <div className="vertical-preview-message">
+            <div className="horizontal-preview-message">
               <span className="preview-icon">✦</span>
               <strong>Waiting for a source</strong>
               <span>{preset.label} preset selected</span>
             </div>
           )}
           {controllerState && (
-            <div className="vertical-preview-status">
+            <div className="horizontal-preview-status">
               <span>{QUALITY_LABELS[controllerState.qualityState]}</span>
               <span>{TRACKING_LABELS[trackingStatus]}</span>
               <span
                 className={gesture.command !== 'none' ? 'gesture-status-active' : ''}
               >
-                {gesture.command === 'none'
-                  ? 'Raise hand, then pinch or spread'
-                  : gesture.label}
+                {gesture.command === 'none' ? 'Tracking overlay ready' : gesture.label}
               </span>
               <span>{controllerState.qualityScale.toFixed(2)}× source scale</span>
             </div>
@@ -201,9 +197,9 @@ export function VerticalPreview({
           Tracking error: {trackingError}
         </p>
       )}
-      <div className="vertical-preview-controls">
+      <div className="horizontal-preview-controls">
         <p className="preview-caption">
-          Target export: 1080 × 1920 at 30 fps.
+          Live 16:9 monitoring frame.
           {streamInfo && ` Source: ${streamInfo.width} × ${streamInfo.height}.`}
         </p>
         <button

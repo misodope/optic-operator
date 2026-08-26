@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   enumerateDevices,
@@ -26,16 +26,42 @@ import { usePresetsStore } from '../store/presets';
 import { useRecordingStore } from '../store/recording';
 import { useSessionStore } from '../store/session';
 import type { PermissionKind } from '../types/camera';
+import {
+  DEFAULT_TRACKING_FEATURES,
+  type TrackingDiagnostics,
+  type TrackingFeatures,
+} from '../types/tracking';
 import { FRAMING_PRESETS } from '../types';
 import { AppShell } from './layout/AppShell';
 import { CameraPreview } from './components/CameraPreview';
 import { DeviceSelector } from './components/DeviceSelector';
 import { PresetSelector } from './components/PresetSelector';
 import { RecordingControls } from './components/RecordingControls';
+import { HorizontalPreview } from './components/HorizontalPreview';
 import { VerticalPreview } from './components/VerticalPreview';
 
 const getMediaDevices = (): MediaDevices | null =>
   globalThis.navigator?.mediaDevices ?? null;
+
+const createResetTracking = (): TrackingDiagnostics => ({
+  status: 'disabled',
+  confidence: 0,
+  subject: null,
+  lastResultTimestampMs: null,
+  inferenceFps: 0,
+  staleResultsDropped: 0,
+  faceLandmarkCount: 0,
+  poseLandmarkCount: 0,
+  handLandmarks: null,
+  gesture: {
+    command: 'none',
+    zoomIntent: 0,
+    confidence: 0,
+    pinchDistance: null,
+    label: null,
+  },
+  error: null,
+});
 
 export function App() {
   const camera = useCameraStore();
@@ -49,15 +75,19 @@ export function App() {
   const setCameraStreamInfo = useCameraStore((state) => state.setStreamInfo);
   const setCameraError = useCameraStore((state) => state.setError);
   const selectedPreset = usePresetsStore((state) => state.selectedPreset);
-  const appVersion = useSessionStore((state) => state.appVersion);
-  const setAppVersion = useSessionStore((state) => state.setAppVersion);
   const setStatus = useSessionStore((state) => state.setStatus);
   const setMessage = useSessionStore((state) => state.setMessage);
   const tracking = useSessionStore((state) => state.tracking);
   const setRecording = useRecordingStore((state) => state.setRecording);
   const setTracking = useSessionStore((state) => state.setTracking);
+  const [focusView, setFocusView] = useState<'vertical' | 'horizontal' | null>(null);
+  const [trackingFeatures, setTrackingFeatures] = useState<TrackingFeatures>(
+    DEFAULT_TRACKING_FEATURES,
+  );
+  const [framingScale, setFramingScale] = useState(1);
   const videoRef = useRef<HTMLVideoElement>(null);
   const outputCanvasRef = useRef<HTMLCanvasElement>(null);
+  const horizontalCanvasRef = useRef<HTMLCanvasElement>(null);
   const activeStreamRef = useRef<MediaStream | null>(null);
   const removeStreamListenerRef = useRef<(() => void) | null>(null);
   const trackerRef = useRef<MediaPipeTracker | null>(null);
@@ -71,6 +101,13 @@ export function App() {
       FRAMING_PRESETS.find((item) => item.id === selectedPreset) ?? FRAMING_PRESETS[0],
     [selectedPreset],
   );
+
+  const toggleTrackingFeature = useCallback((feature: keyof TrackingFeatures): void => {
+    setTrackingFeatures((current) => ({
+      ...current,
+      [feature]: !current[feature],
+    }));
+  }, []);
 
   const stopActiveStream = useCallback((): void => {
     removeStreamListenerRef.current?.();
@@ -396,25 +433,16 @@ export function App() {
     trackerRef.current = null;
 
     if (camera.status !== 'ready' || !streamInfo || !video) {
-      setTracking({
-        status: 'disabled',
-        confidence: 0,
-        subject: null,
-        lastResultTimestampMs: null,
-        inferenceFps: 0,
-        staleResultsDropped: 0,
-        faceLandmarkCount: 0,
-        poseLandmarkCount: 0,
-        handLandmarks: null,
-        gesture: {
-          command: 'none',
-          zoomIntent: 0,
-          confidence: 0,
-          pinchDistance: null,
-          label: null,
-        },
-        error: null,
-      });
+      setTracking(createResetTracking());
+      return undefined;
+    }
+
+    if (
+      !trackingFeatures.face &&
+      !trackingFeatures.body &&
+      !trackingFeatures.gestures
+    ) {
+      setTracking(createResetTracking());
       return undefined;
     }
 
@@ -452,6 +480,7 @@ export function App() {
     try {
       tracker = new MediaPipeTracker({
         modelAssets: DEFAULT_MODEL_ASSETS,
+        features: trackingFeatures,
         onResult: ({ diagnostics }) => {
           if (active) {
             setTracking(diagnostics);
@@ -491,7 +520,7 @@ export function App() {
         trackerRef.current = null;
       }
     };
-  }, [camera.status, camera.streamInfo, setTracking]);
+  }, [camera.status, camera.streamInfo, setTracking, trackingFeatures]);
 
   useEffect(() => {
     let active = true;
@@ -499,9 +528,8 @@ export function App() {
 
     void window.opticOperator.app
       .getVersion()
-      .then((version) => {
+      .then(() => {
         if (active) {
-          setAppVersion(version);
           setStatus('ready');
         }
       })
@@ -524,49 +552,53 @@ export function App() {
       unsubscribe?.();
       stopActiveStream();
     };
-  }, [refreshDevices, setAppVersion, setMessage, setStatus, stopActiveStream]);
+  }, [refreshDevices, setMessage, setStatus, stopActiveStream]);
 
   return (
-    <AppShell
-      status={
-        <span className="app-version">
-          {appVersion ? `v${appVersion}` : 'Initializing'}
-          <span className="topbar-dot" />
-          Local session
-        </span>
-      }
-    >
-      <section className="hero-row">
-        <div>
-          <p className="eyebrow">AI VERTICAL CAMERA</p>
-          <h2 className="hero-title">A quieter, smarter way to stay in frame.</h2>
-          <p className="hero-copy">
-            Connect any camera input directly or route it through OBS Virtual Camera and
-            see the actual source mode negotiated by macOS before recording.
-          </p>
-        </div>
-        <div className="hero-note">
-          <span className="hero-note-label">SOURCE TARGET</span>
-          <strong>Camera input → Mac</strong>
-          <span>Current working input: 1920 × 1080 / 30 fps</span>
-        </div>
-      </section>
+    <AppShell>
+      <section
+        className={`workspace-grid ${focusView ? 'workspace-grid-focus' : ''} ${focusView ? `workspace-grid-focus-${focusView}` : ''}`}
+      >
+        <div className="workspace-main" aria-hidden={Boolean(focusView)}>
+          <CameraPreview
+            deviceLabel={camera.selectedDeviceLabel}
+            status={camera.status}
+            streamInfo={camera.streamInfo}
+            error={camera.error}
+            videoRef={videoRef}
+            onReconnect={handleReconnect}
+            trackingStatus={tracking.status}
+            trackingConfidence={tracking.confidence}
+            trackingError={tracking.error}
+            faceLandmarkCount={tracking.faceLandmarkCount}
+            poseLandmarkCount={tracking.poseLandmarkCount}
+            handLandmarks={tracking.handLandmarks}
+          />
 
-      <section className="preview-grid">
-        <CameraPreview
-          deviceLabel={camera.selectedDeviceLabel}
-          status={camera.status}
-          streamInfo={camera.streamInfo}
-          error={camera.error}
-          videoRef={videoRef}
-          onReconnect={handleReconnect}
-          trackingStatus={tracking.status}
-          trackingConfidence={tracking.confidence}
-          trackingError={tracking.error}
-          faceLandmarkCount={tracking.faceLandmarkCount}
-          poseLandmarkCount={tracking.poseLandmarkCount}
-          handLandmarks={tracking.handLandmarks}
-        />
+          <section className="control-grid">
+            <DeviceSelector
+              onStartSetup={() => void startSetup()}
+              onRefresh={() => void refreshDevices()}
+              onCameraChange={handleCameraChange}
+              onAudioChange={handleAudioChange}
+              onReconnect={handleReconnect}
+            />
+            <PresetSelector
+              trackingFeatures={trackingFeatures}
+              onToggleTrackingFeature={toggleTrackingFeature}
+              framingScale={framingScale}
+              onFramingScaleChange={setFramingScale}
+            />
+            <RecordingControls
+              canStart={camera.status === 'ready' && camera.streamInfo !== null}
+              onStart={handleStartRecording}
+              onStop={handleStopRecording}
+              onCancel={handleCancelRecording}
+              onReveal={handleRevealRecording}
+            />
+          </section>
+        </div>
+
         <VerticalPreview
           preset={preset}
           sourceStatus={camera.status}
@@ -576,34 +608,67 @@ export function App() {
           subject={tracking.subject}
           handLandmarks={tracking.handLandmarks}
           gesture={tracking.gesture}
+          framingScale={framingScale}
+          trackingStatus={tracking.status}
+          trackingError={tracking.error}
+        />
+
+        <HorizontalPreview
+          preset={preset}
+          sourceStatus={camera.status}
+          streamInfo={camera.streamInfo}
+          videoRef={videoRef}
+          canvasRef={horizontalCanvasRef}
+          subject={tracking.subject}
+          handLandmarks={tracking.handLandmarks}
+          gesture={tracking.gesture}
+          framingScale={framingScale}
           trackingStatus={tracking.status}
           trackingError={tracking.error}
         />
       </section>
 
-      <section className="control-grid">
-        <DeviceSelector
-          onStartSetup={() => void startSetup()}
-          onRefresh={() => void refreshDevices()}
-          onCameraChange={handleCameraChange}
-          onAudioChange={handleAudioChange}
-          onReconnect={handleReconnect}
-        />
-        <PresetSelector />
-        <RecordingControls
-          canStart={camera.status === 'ready' && camera.streamInfo !== null}
-          onStart={handleStartRecording}
-          onStop={handleStopRecording}
-          onCancel={handleCancelRecording}
-          onReveal={handleRevealRecording}
-        />
-      </section>
-
-      <footer className="footer-note">
-        <span className="footer-mark">OO</span>
-        <span>Local-first creator tooling · Built for any camera input</span>
-        <span>Vertical capture</span>
-      </footer>
+      {focusView ? (
+        <div className="focus-navigation">
+          <button
+            className="focus-exit-button secondary-button"
+            type="button"
+            onClick={() => setFocusView(null)}
+          >
+            Back to setup
+          </button>
+          <button
+            className="focus-switch-button secondary-button"
+            type="button"
+            onClick={() =>
+              setFocusView(focusView === 'vertical' ? 'horizontal' : 'vertical')
+            }
+          >
+            Open {focusView === 'vertical' ? 'horizontal' : 'vertical'} view
+          </button>
+        </div>
+      ) : (
+        <footer className="footer-note">
+          <span className="footer-mark">OO</span>
+          <span>Local-first creator tooling · Built for any camera input</span>
+          <div className="footer-focus-actions">
+            <button
+              className="footer-focus-button text-button"
+              type="button"
+              onClick={() => setFocusView('vertical')}
+            >
+              Open vertical view
+            </button>
+            <button
+              className="footer-focus-button text-button"
+              type="button"
+              onClick={() => setFocusView('horizontal')}
+            >
+              Open horizontal view
+            </button>
+          </div>
+        </footer>
+      )}
     </AppShell>
   );
 }

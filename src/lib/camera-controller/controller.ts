@@ -14,6 +14,9 @@ import {
   calculateMaxQualityZoom,
   calculateQualityScale,
   calculateTargetZoom,
+  FRAME_SCALE_DEFAULT,
+  FRAME_SCALE_MAX,
+  FRAME_SCALE_MIN,
   qualityStateForScale,
 } from './zoom';
 
@@ -90,6 +93,16 @@ export class CameraController {
       output,
       preset.minQualityScale,
     );
+    const framingScale = clamp(
+      input.framingScale ?? FRAME_SCALE_DEFAULT,
+      FRAME_SCALE_MIN,
+      FRAME_SCALE_MAX,
+    );
+    const manualTargetZoom = clamp(framingScale, 1, targetZoomLimit);
+
+    if (this.lastDetectedAtMs === null) {
+      this.automaticTargetZoom = manualTargetZoom;
+    }
 
     let targetCropCenter = {
       x: previous.targetCropCenterX,
@@ -99,7 +112,13 @@ export class CameraController {
     let lastSubjectTimestampMs = previous.lastSubjectTimestampMs;
 
     if (trackable && subject) {
-      const nextZoom = calculateTargetZoom(subject, preset, baseCrop, targetZoomLimit);
+      const nextZoom = calculateTargetZoom(
+        subject,
+        preset,
+        baseCrop,
+        targetZoomLimit,
+        framingScale,
+      );
       const subjectTargetCenter = subjectTarget(subject, preset, baseCrop, nextZoom);
       const leftPanGain = Math.max(1, preset.leftPanGain);
       targetCropCenter = {

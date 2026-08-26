@@ -6,6 +6,18 @@ export interface LandmarkPoint {
   presence?: number;
 }
 
+export interface TrackingFeatures {
+  face: boolean;
+  body: boolean;
+  gestures: boolean;
+}
+
+export const DEFAULT_TRACKING_FEATURES: TrackingFeatures = {
+  face: true,
+  body: true,
+  gestures: true,
+};
+
 export interface FaceTrackingSummary {
   landmarks: LandmarkPoint[];
   centerX: number;

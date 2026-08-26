@@ -9,14 +9,16 @@ import {
   isHandInGestureZone,
   isUsableHand,
 } from './gestureRecognizer';
-import type {
-  FaceTrackingSummary,
-  GestureState,
-  LandmarkPoint,
-  PoseTrackingSummary,
-  RuntimeTrackingStatus,
-  SubjectState,
-  TrackingDiagnostics,
+import {
+  DEFAULT_TRACKING_FEATURES,
+  type FaceTrackingSummary,
+  type GestureState,
+  type LandmarkPoint,
+  type PoseTrackingSummary,
+  type RuntimeTrackingStatus,
+  type SubjectState,
+  type TrackingFeatures,
+  type TrackingDiagnostics,
 } from '../../../types/tracking';
 import { clamp } from '../../utils/clamp';
 
@@ -45,7 +47,7 @@ export interface SerializedDetectionResult {
 }
 
 export type MediaPipeWorkerRequest =
-  | { type: 'init'; assets: ModelAssetPaths }
+  | { type: 'init'; assets: ModelAssetPaths; features: TrackingFeatures }
   | { type: 'detect'; requestId: number; timestampMs: number; frame: ImageBitmap }
   | { type: 'dispose' };
 
@@ -76,6 +78,7 @@ export interface TrackingResult {
 
 export interface MediaPipeTrackerOptions {
   modelAssets?: ModelAssetPaths;
+  features?: Partial<TrackingFeatures>;
   worker?: MediaPipeWorkerLike;
   workerFactory?: () => MediaPipeWorkerLike;
   imageBitmapFactory?: (video: HTMLVideoElement) => Promise<ImageBitmap>;
@@ -175,6 +178,8 @@ export class MediaPipeTracker {
 
   private readonly modelAssets: ModelAssetPaths;
 
+  private readonly features: TrackingFeatures;
+
   private readonly imageBitmapFactory: (
     video: HTMLVideoElement,
   ) => Promise<ImageBitmap>;
@@ -239,6 +244,7 @@ export class MediaPipeTracker {
 
   constructor(options: MediaPipeTrackerOptions = {}) {
     this.modelAssets = resolveLocalModelAssets(options.modelAssets);
+    this.features = { ...DEFAULT_TRACKING_FEATURES, ...options.features };
     this.worker = options.worker ?? options.workerFactory?.() ?? createDefaultWorker();
     this.imageBitmapFactory =
       options.imageBitmapFactory ?? ((video) => createImageBitmap(video));
@@ -267,7 +273,11 @@ export class MediaPipeTracker {
       this.initializeResolve = resolve;
       this.initializeReject = reject;
     });
-    this.worker.postMessage({ type: 'init', assets: this.modelAssets });
+    this.worker.postMessage({
+      type: 'init',
+      assets: this.modelAssets,
+      features: this.features,
+    });
     return this.initializePromise;
   }
 
@@ -407,8 +417,12 @@ export class MediaPipeTracker {
     this.lastResultTimestampMs = response.timestampMs;
     this.resultCount += 1;
     this.firstResultAtMs ??= response.timestampMs;
-    const pose = normalizePoseLandmarks(response.poseLandmarks);
-    const detectedFace = normalizeFaceLandmarks(response.faceLandmarks);
+    const pose = this.features.body
+      ? normalizePoseLandmarks(response.poseLandmarks)
+      : null;
+    const detectedFace = this.features.face
+      ? normalizeFaceLandmarks(response.faceLandmarks)
+      : null;
     if (detectedFace) {
       this.lastFace = detectedFace;
       this.lastFaceTimestampMs = response.timestampMs;
@@ -424,8 +438,11 @@ export class MediaPipeTracker {
       pose,
       timestampMs: response.timestampMs,
     });
-    const rawHandLandmarks = response.handLandmarks[0] ?? [];
-    const usableHand = isUsableHand(rawHandLandmarks, response.handConfidence);
+    const rawHandLandmarks = this.features.gestures
+      ? (response.handLandmarks[0] ?? [])
+      : [];
+    const usableHand =
+      this.features.gestures && isUsableHand(rawHandLandmarks, response.handConfidence);
     const handInGestureZone = usableHand && isHandInGestureZone(rawHandLandmarks);
     let detectedGesture = handInGestureZone
       ? classifyPinchZoom(
@@ -450,7 +467,10 @@ export class MediaPipeTracker {
     }
     const gesture = this.resolveGesture(detectedGesture, response.timestampMs);
     const diagnostics: TrackingDiagnostics = {
-      status: statusForSubject(subject),
+      status:
+        this.features.face || this.features.body
+          ? statusForSubject(subject)
+          : 'disabled',
       confidence: subject.confidence,
       subject,
       lastResultTimestampMs: response.timestampMs,

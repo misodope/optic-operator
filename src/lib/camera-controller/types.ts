@@ -29,6 +29,7 @@ export interface CameraControllerInput {
   preset: FramingPresetConfig;
   nowMs: number;
   gestureZoom?: number;
+  framingScale?: number;
 }
 
 export interface CameraControllerState {

@@ -11,11 +11,16 @@ import type {
   MediaPipeWorkerResponse,
   SerializedDetectionResult,
 } from './mediapipe';
-import type { LandmarkPoint } from '../../../types/tracking';
+import {
+  DEFAULT_TRACKING_FEATURES,
+  type LandmarkPoint,
+  type TrackingFeatures,
+} from '../../../types/tracking';
 
 let faceLandmarker: FaceLandmarker | null = null;
 let poseLandmarker: PoseLandmarker | null = null;
 let gestureRecognizer: GestureRecognizer | null = null;
+let enabledFeatures: TrackingFeatures = { ...DEFAULT_TRACKING_FEATURES };
 
 const copyLandmarks = (landmarks: NormalizedLandmark[][]): LandmarkPoint[][] =>
   landmarks.map((candidate) =>
@@ -64,6 +69,12 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
   try {
     if (request.type === 'init') {
       closeLandmarkers();
+      enabledFeatures = { ...DEFAULT_TRACKING_FEATURES, ...request.features };
+      if (!enabledFeatures.face && !enabledFeatures.body && !enabledFeatures.gestures) {
+        phase = 'ready with tracking disabled';
+        self.postMessage({ type: 'ready' } satisfies MediaPipeWorkerResponse);
+        return;
+      }
       // The worker itself is an ES module. Use MediaPipe's module loader so the
       // WASM factory is registered in this worker rather than relying on the
       // CommonJS/UMD loader path.
@@ -75,45 +86,51 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
       // prevents each task from re-importing the already-cached module and losing
       // the factory between face and pose initialization.
       const localVision = { ...vision, wasmLoaderPath: '' };
-      phase = 'loading face model';
-      faceLandmarker = await FaceLandmarker.createFromOptions(localVision, {
-        baseOptions: { modelAssetPath: request.assets.face },
-        runningMode: 'VIDEO',
-        // The MVP follows one primary creator. Limiting the task to one face
-        // reduces inference work and avoids switching between candidates.
-        numFaces: 1,
-        minFaceDetectionConfidence: 0.2,
-        minFacePresenceConfidence: 0.2,
-        minTrackingConfidence: 0.2,
-        outputFaceBlendshapes: false,
-        outputFacialTransformationMatrixes: false,
-      });
-      phase = 'loading pose model';
-      // MediaPipe consumes and clears the global factory after creating a task.
-      // Re-register it before creating the second task in this worker.
-      await ensureModuleFactory(request.assets.wasm);
-      poseLandmarker = await PoseLandmarker.createFromOptions(localVision, {
-        baseOptions: { modelAssetPath: request.assets.pose },
-        runningMode: 'VIDEO',
-        numPoses: 1,
-        minPoseDetectionConfidence: 0.4,
-        minPosePresenceConfidence: 0.4,
-        minTrackingConfidence: 0.4,
-        outputSegmentationMasks: false,
-      });
-      phase = 'loading gesture model';
-      await ensureModuleFactory(request.assets.wasm);
-      gestureRecognizer = await GestureRecognizer.createFromOptions(localVision, {
-        baseOptions: { modelAssetPath: request.assets.gesture },
-        runningMode: 'VIDEO',
-        numHands: 1,
-        // Keep detection sensitive enough to find a creator's hand farther
-        // from the camera. The renderer applies its own geometry and timing
-        // gates before allowing a zoom command.
-        minHandDetectionConfidence: 0.3,
-        minHandPresenceConfidence: 0.3,
-        minTrackingConfidence: 0.3,
-      });
+      if (enabledFeatures.face) {
+        phase = 'loading face model';
+        faceLandmarker = await FaceLandmarker.createFromOptions(localVision, {
+          baseOptions: { modelAssetPath: request.assets.face },
+          runningMode: 'VIDEO',
+          // The MVP follows one primary creator. Limiting the task to one face
+          // reduces inference work and avoids switching between candidates.
+          numFaces: 1,
+          minFaceDetectionConfidence: 0.2,
+          minFacePresenceConfidence: 0.2,
+          minTrackingConfidence: 0.2,
+          outputFaceBlendshapes: false,
+          outputFacialTransformationMatrixes: false,
+        });
+      }
+      if (enabledFeatures.body) {
+        phase = 'loading pose model';
+        // MediaPipe consumes and clears the global factory after creating a task.
+        // Re-register it before creating the second task in this worker.
+        await ensureModuleFactory(request.assets.wasm);
+        poseLandmarker = await PoseLandmarker.createFromOptions(localVision, {
+          baseOptions: { modelAssetPath: request.assets.pose },
+          runningMode: 'VIDEO',
+          numPoses: 1,
+          minPoseDetectionConfidence: 0.4,
+          minPosePresenceConfidence: 0.4,
+          minTrackingConfidence: 0.4,
+          outputSegmentationMasks: false,
+        });
+      }
+      if (enabledFeatures.gestures) {
+        phase = 'loading gesture model';
+        await ensureModuleFactory(request.assets.wasm);
+        gestureRecognizer = await GestureRecognizer.createFromOptions(localVision, {
+          baseOptions: { modelAssetPath: request.assets.gesture },
+          runningMode: 'VIDEO',
+          numHands: 1,
+          // Keep detection sensitive enough to find a creator's hand farther
+          // from the camera. The renderer applies its own geometry and timing
+          // gates before allowing a zoom command.
+          minHandDetectionConfidence: 0.3,
+          minHandPresenceConfidence: 0.3,
+          minTrackingConfidence: 0.3,
+        });
+      }
       phase = 'running inference';
       self.postMessage({ type: 'ready' } satisfies MediaPipeWorkerResponse);
       return;
@@ -125,32 +142,25 @@ const handleMessage = async (request: MediaPipeWorkerRequest): Promise<void> => 
       return;
     }
 
-    if (!faceLandmarker || !poseLandmarker || !gestureRecognizer) {
-      throw new Error('MediaPipe tracker is not initialized.');
-    }
-
-    const faceResult = faceLandmarker.detectForVideo(
-      request.frame,
-      request.timestampMs,
-    );
-    const poseResult = poseLandmarker.detectForVideo(
-      request.frame,
-      request.timestampMs,
-    );
-    const gestureResult = gestureRecognizer.recognizeForVideo(
-      request.frame,
-      request.timestampMs,
-    );
+    const faceResult = faceLandmarker
+      ? faceLandmarker.detectForVideo(request.frame, request.timestampMs)
+      : null;
+    const poseResult = poseLandmarker
+      ? poseLandmarker.detectForVideo(request.frame, request.timestampMs)
+      : null;
+    const gestureResult = gestureRecognizer
+      ? gestureRecognizer.recognizeForVideo(request.frame, request.timestampMs)
+      : null;
     const result: SerializedDetectionResult = {
       type: 'result',
       requestId: request.requestId,
       timestampMs: request.timestampMs,
-      faceLandmarks: copyLandmarks(faceResult.faceLandmarks),
-      poseLandmarks: copyLandmarks(poseResult.landmarks),
-      handLandmarks: copyLandmarks(gestureResult.landmarks),
+      faceLandmarks: faceResult ? copyLandmarks(faceResult.faceLandmarks) : [],
+      poseLandmarks: poseResult ? copyLandmarks(poseResult.landmarks) : [],
+      handLandmarks: gestureResult ? copyLandmarks(gestureResult.landmarks) : [],
       // A detected hand can have no useful handedness score. The renderer
       // applies the geometric size gate and temporal debounce separately.
-      handConfidence: gestureResult.handedness[0]?.[0]?.score ?? 1,
+      handConfidence: gestureResult?.handedness[0]?.[0]?.score ?? 0,
     };
     request.frame.close();
     self.postMessage(result satisfies MediaPipeWorkerResponse);

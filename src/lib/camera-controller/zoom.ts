@@ -3,6 +3,10 @@ import type { FramingPresetConfig } from '../../types/presets';
 import type { SubjectState } from '../../types/tracking';
 import type { Dimensions, NormalizedRect, QualityState } from './types';
 
+export const FRAME_SCALE_MIN = 0.85;
+export const FRAME_SCALE_MAX = 1.15;
+export const FRAME_SCALE_DEFAULT = 1;
+
 export const calculateBaseCropSize = (
   source: Dimensions,
   output: Dimensions,
@@ -100,13 +104,16 @@ export const calculateTargetZoom = (
   preset: FramingPresetConfig,
   baseCrop: { width: number; height: number },
   maxQualityZoom: number,
+  framingScale = FRAME_SCALE_DEFAULT,
 ): number => {
   if (!subject?.detected || !subject.shoulderWidth || baseCrop.width <= 0) {
     return 1;
   }
 
   const shoulderVisibility = clamp(preset.preferredShoulderVisibility, 0.25, 1);
-  const requestedZoom = subject.shoulderWidth / (baseCrop.width * shoulderVisibility);
+  const requestedZoom =
+    (subject.shoulderWidth / (baseCrop.width * shoulderVisibility)) *
+    clamp(framingScale, FRAME_SCALE_MIN, FRAME_SCALE_MAX);
 
   return clamp(requestedZoom, 1, maxQualityZoom);
 };
